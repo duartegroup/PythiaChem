@@ -994,8 +994,6 @@ def get_feature_names_from_column_transformers(ctransformer):
 
     return new_feature_names
 
-############### NOT VERY USEFUL #################
-
 
 
 def grid_search_reg_parameters_ML(rgs, Xtrain, ytrain, rgs_options, rgs_names, iteration, no_train_output, cv=5, name=None,scoring=("r2","neg_root_mean_squared_error")):
