@@ -212,7 +212,7 @@ def plot_pr_curve(
 def plot_confusion_matrix(
     cmx,
     axes=None,
-    col_map="RdYlBu",
+    col_map="rocket",
     labels=(0, 1),
     title="Confusion Matrix",
     x_label="Predicted Class",
@@ -229,7 +229,14 @@ def plot_confusion_matrix(
 
     cmx_df = pd.DataFrame(data=cmx, columns=labels, index=labels)
     # sns.set(font_scale=1.4)
-    axes = sns.heatmap(cmx_df, annot=True, ax=axes, fmt="d")
+    axes = sns.heatmap(
+        cmx_df,
+        annot=True,
+        annot_kws={"fontsize": fontsize},
+        ax=axes,
+        fmt="d",
+        cmap=col_map,
+    )
     axes.set_title(title, fontsize=fontsize + 2)
     axes.set_xlabel(x_label, fontsize=fontsize + 1)
     axes.set_ylabel(y_label, fontsize=fontsize + 1)
