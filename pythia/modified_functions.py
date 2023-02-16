@@ -6,7 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import GridSearchCV, cross_val_score
 from sklearn.metrics import precision_recall_fscore_support
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import roc_curve, auc
@@ -64,7 +64,7 @@ def grid_search_classifier_parameters(
     )
     log.debug("\tCV xtrain: {}".format(Xtrain))
 
-    optparam_search.fit(Xtrain, ytrain.values.ravel())
+    optparam_search.fit(Xtrain.values, ytrain.values.ravel())
     opt_parameters = optparam_search.best_params_
 
     if no_train_output is False:
@@ -96,6 +96,7 @@ def test_imbalanced_classifiers_single_fold(
     no_train_output=False,
     random_seed=107901,
     overwrite=False,
+    plot_roc=False,
 ):
     """
     function to run classification test over classifiers using imbalanced resampling, with hyperparameter tuning
@@ -107,16 +108,16 @@ def test_imbalanced_classifiers_single_fold(
     :param testclasses: iterable - list of test labels
     :param classifiers: list - list of classifier methods
     :param clf_options: dict - dict of classifier parameters
-    :param cv: int - number of folds for GridSearchCV
+    :param cv: int or CV splitter - folds for GridSearchCV
     :param clf_names: list – list of classifier method names
     :param class_labels: tuple - tuple of class labels (e.g. (0,1) for binary classification)
     :param no_train_output: bool - whether to suppress GridSearchCV training output, defaults to False
     :param random_seed: int - random seed to use
     :param overwrite: bool - whether to overwrite existing data, defaults to False
+    :param plot_roc: bool - whether to plot roc curves, defaults to False
 
     :return clfs: list - list of estimator objects
     :return opt_params: list - list of optimal parameters
-    # :param plot: true/false - plot the results or not (not implemented?)
     """
 
     log = logging.getLogger(__name__)
@@ -221,34 +222,37 @@ def test_imbalanced_classifiers_single_fold(
             ytest, predicted_clf, output_dict=True
         )
 
-        # Plot the roc curves (removed for now)
-        """
-        figure, ax = plt.subplots(figsize=(8, 6))
-        ax.plot(fpr, tpr, color="red", lw=1.5, label=f"ROC curve (auc = {roc_auc:.2f})")
+        # Plot the roc curves (now made optional)
+        if plot_roc:
+            figure, ax = plt.subplots(figsize=(8, 6))
+            ax.plot(
+                fpr, tpr, color="red", lw=1.5, label=f"ROC curve (auc = {roc_auc:.2f})"
+            )
 
-        ax.plot([0, 1], [0, 1], "k:")
-        ax.set_xlim(xmin=0.0, xmax=1.01)
-        ax.set_ylim(ymin=0.0, ymax=1.01)
-        ax.set_xlabel("False Positive Rate")
-        ax.set_ylabel("True Positive Rate")
-        ax.legend(loc="lower right")
+            ax.plot([0, 1], [0, 1], "k:")
+            ax.set_xlim(xmin=0.0, xmax=1.01)
+            ax.set_ylim(ymin=0.0, ymax=1.01)
+            ax.set_xlabel("False Positive Rate")
+            ax.set_ylabel("True Positive Rate")
+            ax.legend(loc="lower right")
 
-        precision_label = f"Precision: class 0 = {output_dict[0]['pre']:.2f}, class 1 = {output_dict[1]['pre']:.2f}"
-        recall_label = f"Recall: class 0 = {output_dict[0]['rec']:.2f}, class 1 = {output_dict[1]['rec']:.2f}"
-        f1_label = f"F1 score: class 0 = {output_dict[0]['f1']:.2f}, class 1 = {output_dict[1]['f1']:.2f}"
-        annot_str = f"{precision_label}\n{recall_label}\n{f1_label}"
+            precision_label = f"Precision: class 0 = {output_dict[0]['pre']:.2f}, class 1 = {output_dict[1]['pre']:.2f}"
+            recall_label = f"Recall: class 0 = {output_dict[0]['rec']:.2f}, class 1 = {output_dict[1]['rec']:.2f}"
+            f1_label = f"F1 score: class 0 = {output_dict[0]['f1']:.2f}, class 1 = {output_dict[1]['f1']:.2f}"
+            annot_str = f"{precision_label}\n{recall_label}\n{f1_label}"
 
-        ax.annotate(
-            annot_str,
-            xy=(0.5, 0),
-            xycoords="figure fraction",
-            size=9,
-            ha="center",
-            va="bottom",
-        )
-        figure.tight_layout()
-        plt.savefig(f"{name}/{name}_roc_curve.png")
-        """
+            ax.annotate(
+                annot_str,
+                xy=(0.5, 0),
+                xycoords="figure fraction",
+                size=9,
+                ha="center",
+                va="bottom",
+            )
+            figure.tight_layout()
+            plt.savefig(f"{name}/{name}_roc_curve.png")
+            plt.show()
+
         reports.append(classification_report_imbalanced(ytest, predicted_clf))
 
         sensitvity, specificity, support = sensitivity_specificity_support(
@@ -288,8 +292,6 @@ def test_imbalanced_classifiers_single_fold(
         pred.to_csv(f"{name}/{name}_predictions.csv")
         iteration += 1
 
-        plt.show()
-
     log_df["roc_auc"] = pd.Series(roc_aucs)
 
     log_df["report"] = pd.Series(reports)
@@ -300,3 +302,84 @@ def test_imbalanced_classifiers_single_fold(
     log_df.to_csv("logs2.csv")
 
     return clfs, opt_params
+
+
+def test_classifiers_nested(
+    df,
+    classes,
+    classifiers,
+    clf_options,
+    inner_cv=5,
+    outer_cv=5,
+    scoring="roc_auc",
+    score_name="roc_auc",
+    clf_names=None,
+    random_seed=107901,
+):
+    """
+    Doing nested_cv for model selection.
+    Not obtaining a final model here, just looking at scores.
+    See https://scikit-learn.org/stable/auto_examples/model_selection/plot_nested_cross_validation_iris.html
+    for an example
+
+    :param df: dataframe - training dataframe of features and identifiers (smiles and/or names)
+    :param classes: iterable - list of training labels
+    :param classifiers: list - list of classifier methods
+    :param clf_options: dict - dict of classifier parameters
+    :param inner_cv: int or CV splitter - folds for the inner CV (GridSearchCV)
+    :param outer_cv: int or CV splitter - folds for the outer CV (cross_val_score)
+    :param clf_names: list – list of classifier method names
+    :param class_labels: tuple - tuple of class labels (e.g. (0,1) for binary classification)
+    :param no_train_output: bool - whether to suppress GridSearchCV training output, defaults to False
+    :param random_seed: int - random seed to use
+    :param overwrite: bool - whether to overwrite existing data, defaults to False
+
+    :return clfs: list - list of estimator objects
+    :return opt_params: list - list of optimal parameters
+    """
+
+    log = logging.getLogger(__name__)
+
+    scores = {}
+
+    iteration = 0
+    data = df.copy()
+    data.reset_index(inplace=True)
+
+    # Training data
+    Xtrain = df
+    log.debug("Train X\n{}".format(Xtrain))
+    df.to_csv("Xtrain.csv")
+    ytrain = classes
+    log.debug("Train Y\n{}".format(ytrain))
+
+    if clf_names is None:
+        clf_names = [i for i in range(0, len(classifiers))]
+
+    for name, classf in zip(clf_names, classifiers):
+        log.info("\n-----\nBegin {}\n-----\n".format(name))
+
+        parameters = clf_options[name]
+        print(parameters)
+        # Just want the nested CV scores here
+        clf = GridSearchCV(
+            classf,
+            parameters,
+            cv=inner_cv,
+            scoring=scoring,
+            refit=scoring,
+        )
+        nested_score = cross_val_score(
+            clf, X=Xtrain.values, y=ytrain.values.ravel(), cv=outer_cv, scoring=scoring
+        )
+        scores[name] = nested_score
+
+    score_label = f"Mean_{score_name}"
+    scores_df = pd.DataFrame.from_dict(scores, orient="index")
+    scores_df[score_label] = scores_df.mean(axis=1)
+
+    if not os.path.isdir("nested_cv_results"):
+        os.makedirs("nested_cv_results")
+    scores_df.to_csv(f"nested_cv_results/nested_cv_{score_name}.csv")
+
+    return scores_df
