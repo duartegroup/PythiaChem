@@ -26,6 +26,7 @@ def grid_search_classifier_parameters(
     no_train_output=False,
     cv=5,
     name=None,
+    prefix=None,
     scoring=("roc_auc", "precision", "recall"),
 ):
     """Does GridSearchCV (hyperparameter tuning) and finds the best report metrics if requested
@@ -40,6 +41,8 @@ def grid_search_classifier_parameters(
         no_train_output (boolean, optional): Whether to suppress output. Defaults to False.
         cv (int, optional): Cv to use in GridSearchCV. Defaults to 5.
         name (str, optional): Classifier name. Defaults to None.
+        prefix (str, optional): Subdirectory for output data (when testing multiple
+            descriptors)
         scoring (tuple, optional): Scoring to use. Defaults to ("roc_auc", "precision", "recall").
 
     Returns:
@@ -48,6 +51,10 @@ def grid_search_classifier_parameters(
 
     """
     log = logging.getLogger(__name__)
+    if prefix is None:
+        outdir = name
+    else:
+        outdir = prefix
 
     # Grid search model optimizer
     parameters = clf_options[clf_names[iteration]]
@@ -69,7 +76,7 @@ def grid_search_classifier_parameters(
 
     if no_train_output is False:
         reported_metrics = pd.DataFrame(data=optparam_search.cv_results_)
-        reported_metrics.to_csv("{}/{}_grid_search_metrics.csv".format(name, name))
+        reported_metrics.to_csv(f"{outdir}/{name}_grid_search_metrics.csv")
         log.info("\tBest parameters; {}".format(opt_parameters))
         for mean, std, params in zip(
             optparam_search.cv_results_["mean_test_{}".format(scoring[0])],
@@ -95,6 +102,7 @@ def test_imbalanced_classifiers_single_fold(
     class_labels=(0, 1),
     no_train_output=False,
     random_seed=107901,
+    prefix=None,
     overwrite=False,
     plot_roc=False,
 ):
@@ -113,6 +121,8 @@ def test_imbalanced_classifiers_single_fold(
     :param class_labels: tuple - tuple of class labels (e.g. (0,1) for binary classification)
     :param no_train_output: bool - whether to suppress GridSearchCV training output, defaults to False
     :param random_seed: int - random seed to use
+    :param prefix: str - subdirectory for output data (when testing multiple
+        descriptors)
     :param overwrite: bool - whether to overwrite existing data, defaults to False
     :param plot_roc: bool - whether to plot roc curves, defaults to False
 
@@ -136,14 +146,14 @@ def test_imbalanced_classifiers_single_fold(
     # Training data
     Xtrain = df
     log.debug("Train X\n{}".format(Xtrain))
-    df.to_csv("Xtrain.csv")
+    #df.to_csv("Xtrain.csv")
     ytrain = classes
     log.debug("Train Y\n{}".format(ytrain))
 
     # Testing data
     Xtest = test_df
     log.debug("Test X\n{}".format(Xtest))
-    test_df.to_csv("Xtest.csv")
+    #test_df.to_csv("Xtest.csv")
     ytest = testclasses
     log.debug("Test Y\n{}".format(ytest))
 
@@ -155,16 +165,21 @@ def test_imbalanced_classifiers_single_fold(
 
         name = "{}".format("_".join(name.split()))
 
+        if prefix is None:
+            outdir = name
+        else:
+            outdir = f"{prefix}/{name}"
+
         # Make directory for each classifier
-        if not os.path.isdir(name):
-            os.makedirs(name, exist_ok=True)
-        elif overwrite is False and os.path.isdir(name) is True:
+        if not os.path.isdir(outdir):
+            os.makedirs(outdir, exist_ok=True)
+        elif overwrite is False and os.path.isdir(outdir) is True:
             log.warning(
                 "Directory already exists and overwrite is False will stop before overwriting."
             )
             return None
         else:
-            log.info(f"Directory {name} already exists will be overwritten")
+            log.info(f"Directory {outdir} already exists will be overwritten")
 
         # Grid search model optimizer, which will refit at the end to get the final model with optimised parameters
         clf, opt_param = grid_search_classifier_parameters(
@@ -177,6 +192,7 @@ def test_imbalanced_classifiers_single_fold(
             no_train_output,
             cv=cv,
             name=name,
+            prefix=prefix,
         )
         clfs.append(clf)
         opt_params.append(opt_param)
@@ -188,7 +204,7 @@ def test_imbalanced_classifiers_single_fold(
         sc_df = pd.DataFrame(
             data=np.array(sc).T, columns=["precision", "recall", "f1score", "support"]
         )
-        sc_df.to_csv(os.path.join(name, "PRFS_score.csv"))
+        sc_df.to_csv(os.path.join(outdir, "PRFS_score.csv"))
 
         ## evaluate the principal score metric only (incase different to those above although this is unlikely)
         clf_score = clf.score(Xtest, ytest)
@@ -250,7 +266,7 @@ def test_imbalanced_classifiers_single_fold(
                 va="bottom",
             )
             figure.tight_layout()
-            plt.savefig(f"{name}/{name}_roc_curve.png")
+            plt.savefig(f"{outdir}/{name}_roc_curve.png")
             plt.show()
 
         reports.append(classification_report_imbalanced(ytest, predicted_clf))
@@ -289,7 +305,7 @@ def test_imbalanced_classifiers_single_fold(
 
         pred = pd.DataFrame(pred).T
         pred.columns = pred_cols
-        pred.to_csv(f"{name}/{name}_predictions.csv")
+        pred.to_csv(f"{outdir}/{name}_predictions.csv")
         iteration += 1
 
     log_df["roc_auc"] = pd.Series(roc_aucs)
@@ -299,7 +315,10 @@ def test_imbalanced_classifiers_single_fold(
 
     log_df["c_matrix"] = pd.Series(c_matrices)
 
-    log_df.to_csv("logs2.csv")
+    if prefix is None:
+        log_df.to_csv("logs2.csv")
+    else:
+        log_df.to_csv(f"{prefix}/logs2.csv")
 
     return clfs, opt_params
 
@@ -314,13 +333,13 @@ def test_classifiers_nested(
     scoring="roc_auc",
     score_name="roc_auc",
     clf_names=None,
+    prefix=None,
     random_seed=107901,
 ):
     """
-    Doing nested_cv for model selection.
-    Not obtaining a final model here, just looking at scores.
-    See https://scikit-learn.org/stable/auto_examples/model_selection/plot_nested_cross_validation_iris.html
-    for an example
+    Nested cross validation for model selection (looking at scores only)
+    Only accepts one type of scoring each time
+    Based on https://scikit-learn.org/stable/auto_examples/model_selection/plot_nested_cross_validation_iris.html
 
     :param df: dataframe - training dataframe of features and identifiers (smiles and/or names)
     :param classes: iterable - list of training labels
@@ -328,21 +347,21 @@ def test_classifiers_nested(
     :param clf_options: dict - dict of classifier parameters
     :param inner_cv: int or CV splitter - folds for the inner CV (GridSearchCV)
     :param outer_cv: int or CV splitter - folds for the outer CV (cross_val_score)
+    :param scoring: str or callable - a single string or a callable that returns a
+        single value for scoring
+    :param score_name: str - name for scoring method
     :param clf_names: list – list of classifier method names
-    :param class_labels: tuple - tuple of class labels (e.g. (0,1) for binary classification)
-    :param no_train_output: bool - whether to suppress GridSearchCV training output, defaults to False
+    :param prefix: str - subdirectory for nested CV scores (when testing multiple
+        descriptors)
     :param random_seed: int - random seed to use
-    :param overwrite: bool - whether to overwrite existing data, defaults to False
 
-    :return clfs: list - list of estimator objects
-    :return opt_params: list - list of optimal parameters
+    :return scores_df: DataFrame - scores for each outer CV and mean score
     """
 
     log = logging.getLogger(__name__)
 
     scores = {}
 
-    iteration = 0
     data = df.copy()
     data.reset_index(inplace=True)
 
@@ -367,7 +386,7 @@ def test_classifiers_nested(
             parameters,
             cv=inner_cv,
             scoring=scoring,
-            refit=scoring,
+            refit=True,
         )
         nested_score = cross_val_score(
             clf, X=Xtrain.values, y=ytrain.values.ravel(), cv=outer_cv, scoring=scoring
@@ -378,8 +397,13 @@ def test_classifiers_nested(
     scores_df = pd.DataFrame.from_dict(scores, orient="index")
     scores_df[score_label] = scores_df.mean(axis=1)
 
-    if not os.path.isdir("nested_cv_results"):
-        os.makedirs("nested_cv_results")
-    scores_df.to_csv(f"nested_cv_results/nested_cv_{score_name}.csv")
+    if prefix is None:
+        if not os.path.isdir("nested_cv_results"):
+            os.makedirs("nested_cv_results")
+        scores_df.to_csv(f"nested_cv_results/nested_cv_{score_name}.csv")
+    else:
+        if not os.path.isdir(f"nested_cv_results/{prefix}"):
+            os.makedirs(f"nested_cv_results/{prefix}")
+        scores_df.to_csv(f"nested_cv_results/{prefix}/nested_cv_{score_name}.csv")
 
     return scores_df
