@@ -59,7 +59,7 @@ def plot_roc_curve(
     savefigure=False,
     filename=None,
     size=(10, 10),
-    fontsize=15,
+    fontsize=20,
     return_raw_data=False,
 ):
     """ """
@@ -148,7 +148,7 @@ def plot_pr_curve(
     savefigure=False,
     filename=None,
     size=(10, 10),
-    fontsize=15,
+    fontsize=20,
     return_raw_data=False,
 ):
     """ """
@@ -237,9 +237,12 @@ def plot_confusion_matrix(
         fmt="d",
         cmap=col_map,
     )
+    cbar = axes.collections[0].colorbar
     axes.set_title(title, fontsize=fontsize + 2)
     axes.set_xlabel(x_label, fontsize=fontsize + 1)
     axes.set_ylabel(y_label, fontsize=fontsize + 1)
+    axes.tick_params(labelsize=fontsize)
+    cbar.ax.tick_params(labelsize=fontsize - 2)
 
     display(axes)
     return axes

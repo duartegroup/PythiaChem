@@ -322,7 +322,7 @@ def plot_metrics_skplot(
     labels=(0, 1),
     name="metric_plots.png",
     figsize=(30, 10),
-    textsize=15,
+    textsize=20,
 ):
     """
     Plot using skplot library the confusion matrix, ROC curve and precision recall curve on one diagram and save to file
@@ -485,6 +485,7 @@ def calculate_confusion_based_metrics(
     vmax=None,
     col_map="viridis",
     annotate=True,
+    fontsize=20,
     title=None,
 ):
     """
@@ -541,6 +542,7 @@ def calculate_confusion_based_metrics(
                     vmin=vmin,
                     vmax=vmax,
                     title=title,
+                    fontsize=fontsize,
                 )
         else:
             log.info("Looks like provided data is not a pandas dataframe - ERROR")
