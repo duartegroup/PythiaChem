@@ -377,7 +377,7 @@ def plot_metrics_skplot(
         plot_micro=plot_micro,
     )
 
-    plt.savefig(name)
+    plt.savefig(name, dpi=600)
 
 
 def calculate_multi_label_confusion_based_metrics(
@@ -485,7 +485,7 @@ def calculate_confusion_based_metrics(
     vmax=None,
     col_map="viridis",
     annotate=True,
-    fontsize=20,
+    fontsize=14,
     title=None,
 ):
     """

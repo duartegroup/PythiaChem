@@ -59,7 +59,7 @@ def plot_roc_curve(
     savefigure=False,
     filename=None,
     size=(10, 10),
-    fontsize=20,
+    fontsize=14,
     return_raw_data=False,
 ):
     """ """
@@ -110,10 +110,10 @@ def plot_roc_curve(
 
         if savefigure is True and ax is None:
             if filename is not None:
-                plt.savefig("{}".format(filename))
+                plt.savefig("{}".format(filename), dpi=600)
             else:
                 filename = "roc.png"
-                plt.savefig("roc.png")
+                plt.savefig("roc.png", dpi=600)
 
     if not return_raw_data:
         return axes
@@ -148,7 +148,7 @@ def plot_pr_curve(
     savefigure=False,
     filename=None,
     size=(10, 10),
-    fontsize=20,
+    fontsize=14,
     return_raw_data=False,
 ):
     """ """
@@ -198,10 +198,10 @@ def plot_pr_curve(
 
         if savefigure is True and ax is None:
             if filename is not None:
-                plt.savefig("{}".format(filename))
+                plt.savefig("{}".format(filename), dpi=600)
             else:
                 filename = "pr.png"
-                plt.savefig("pr.png")
+                plt.savefig("pr.png", dpi=600)
 
     if not return_raw_data:
         return axes
@@ -217,7 +217,7 @@ def plot_confusion_matrix(
     title="Confusion Matrix",
     x_label="Predicted Class",
     y_label="Known Class",
-    fontsize=20,
+    fontsize=14,
     annotate=False,
     vmin=None,
     vmax=None,
@@ -257,7 +257,7 @@ def plot_metrics(
     labels=(0, 1),
     name="metric_plots.png",
     figsize=None,
-    fontsize=20,
+    fontsize=14,
     col_map="viridis",
     all_classes=True,
     roc_curve=True,
@@ -279,16 +279,16 @@ def plot_metrics(
         lclasses = list(classes)
         if roc_curve is True and pr_curve is True:
             if figsize is None:
-                figsize = ((len(classes) + 2) * 10, 10)
+                figsize = ((len(classes) + 2) * 6, 6)
             fig, axs = plt.subplots(1, len(classes) + 2, figsize=figsize)
 
         elif roc_curve is True or pr_curve is True:
             if figsize is None:
-                figsize = ((len(classes) + 1) * 10, 10)
+                figsize = ((len(classes) + 1) * 6, 6)
             fig, axs = plt.subplots(1, len(classes) + 1, figsize=figsize)
         else:
             if figsize is None:
-                figsize = (len(classes) * 10, 10)
+                figsize = (len(classes) * 6, 6)
             fig, axs = plt.subplots(1, len(classes), figsize=figsize)
 
         if title is not None:
@@ -335,23 +335,23 @@ def plot_metrics(
             )
 
         plt.tight_layout()
-        plt.savefig(name)
+        plt.savefig(name, dpi=600)
 
     else:
         classes = set(df[predicted_column_name].values)
         lclasses = list(classes)
         if roc_curve is True and pr_curve is True:
             if figsize is None:
-                figsize = (30, 10)
+                figsize = (18, 6)
             fig, axs = plt.subplots(1, 3, figsize=figsize)
 
         elif roc_curve is True or pr_curve is True:
             if figsize is None:
-                figsize = (20, 10)
+                figsize = (12, 6)
             fig, axs = plt.subplots(1, 2, figsize=figsize)
         else:
             if figsize is None:
-                figsize = (10, 10)
+                figsize = (6, 6)
             fig, axs = plt.subplots(1, 1, figsize=figsize)
 
         if title is not None:
@@ -397,4 +397,4 @@ def plot_metrics(
             )
 
         plt.tight_layout()
-        plt.savefig(name)
+        plt.savefig(name, dpi=600)
