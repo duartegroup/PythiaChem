@@ -63,6 +63,7 @@ import seaborn as sns
 import mlxtend
 from mlxtend.evaluate import permutation_test as pt
 from IPython.display import Image, display
+import py3Dmol
 
 def autoscale(df):
     """
@@ -138,6 +139,183 @@ def smiles_to_molcule(s, addH=True, canonicalize=True, threed=True, add_stereo=F
         AllChem.EmbedMolecule(mol, randomSeed=random_seed)
 
     return mol 
+
+
+
+def draw_3D_mol(m,p=None,confId=-1):
+    """
+    Draw and visualize an input molecule in 3D
+   
+    """
+        mb = Chem.MolToMolBlock(m,confId=confId)
+        if p is None:
+            p = py3Dmol.view(width=400,height=400)
+        p.removeAllModels()
+        p.addModel(mb,'sdf')
+        p.setStyle({'stick':{}})
+        p.setBackgroundColor('0xeeeeee')
+        p.zoomTo()
+        return p.show()
+    
+
+
+
+def RDkit_descriptors(mols):
+    """
+    Generate both 2D and 3D RDkit Descriptors. There are 208 in total.
+
+    :param mols: a list of RDkit mol objects with EmBedding
+    """
+    calc = MoleculeDescriptors.MolecularDescriptorCalculator([x[0] for x in Descriptors._descList])
+    desc_names = calc.GetDescriptorNames()
+    
+    Mol_descriptors =[]
+    for mol in mols:
+        # Calculate all descriptors for each molecule
+        descriptors = calc.CalcDescriptors(mol)
+        Mol_descriptors.append(descriptors)
+        
+    df = pd.DataFrame(Mol_descriptors,columns=desc_names)
+    df = df.fillna(0)
+        
+    return df
+
+
+
+
+def feature_categorization(features_df, feature_types = "some_categorial"):
+
+    """
+    In the case there are both categorial and non-categorial features, this function split the categorial features.
+    
+    :param feature_df: a dataframe containing all features
+    :param feature_types: no_catagorical, some_catagorical, all_catagirical
+    
+    """
+    #Automatic selection of categorical feaures
+    catagorical_indxs = []
+    for column in features_df:
+        arr = features_df[column]
+        #print(arr.name)
+        if arr.dtype.name == 'int64':
+            index_no = features_df.columns.get_loc(arr.name)
+           #print(index_no)
+            catagorical_indxs.append(index_no)
+
+
+
+    feature_columns = features_df.columns
+
+    # Backup
+    backup_feats_df = features_df.copy()
+
+    # None catagorical only scale the data as numbers
+    if feature_types == "no_categorial":
+        mm_scaler = MinMaxScaler()
+        features_df = mm_scaler.fit_transform(features_df)
+        log.info(pd.DataFrame(features_df, columns=feature_columns))
+        features_df = pd.DataFrame(features_df, columns=feature_columns)
+
+    # Some catagorical - Need to provide the indexes
+    elif feature_types == "some_categorial":
+        numeric_features = [feature_columns[i] for i in range(len(feature_columns)) if i not in catagorical_indxs]
+        numerical_transformer = MinMaxScaler()
+        categorical_features = [feature_columns[i] for i in range(len(feature_columns)) if i in catagorical_indxs]
+        categorical_transformer = OneHotEncoder(handle_unknown='ignore')
+        if any(ent in categorical_features for ent in numeric_features):
+            log.warning("WARNING - numeric and catagorical feature specififed overlap")
+            log.info(numeric_features)
+            log.info(categorical_features)
+        else:
+            log.info("Numerical features:\n{} {}".format(numeric_features, len(numeric_features)))
+            log.info("Catagorical features:\n{} {}".format(categorical_features, len(catagorical_indxs)))
+
+        preprocessor = ColumnTransformer(
+        transformers=[
+            ("numerical", numerical_transformer, numeric_features),
+            ('catagorical', categorical_transformer, categorical_features)])
+
+        features_df = preprocessor.fit_transform(features_df)
+        #display(features_df)
+        feature_names = get_feature_names_from_column_transformers(preprocessor)
+        catagorical_indxs = [i for i in range(len(numeric_features), len(feature_names))]
+        log.info(feature_names)
+
+        log.info(pd.DataFrame(features_df, columns=feature_names))
+        features_df = pd.DataFrame(features_df, columns=feature_names)
+        log.info("catagorical indexes {}".format(catagorical_indxs))
+        log.info("Catagorical features start on column name {} and end on {}".format(features_df.columns[catagorical_indxs[0]], features_df.columns[catagorical_indxs[-1]]))
+
+    # All catagorical
+    elif feature_types == "categorial":
+        categorical_transformer = OneHotEncoder(handle_unknown='ignore')
+        features_df = categorical_transformer.fit_transform(features_df).toarray()
+        feature_names = [categorical_transformer.get_feature_names(feature_columns)]
+        features_df = pd.DataFrame(features_df, columns=feature_names)
+        log.info(features_df)
+
+    # No scaling or other encoding
+    else:
+        log.info("No scaling")
+
+    return features_df
+
+
+
+def clean_correlated_features(features, thresh = 0.8, clean01 = True):
+    """
+    This function calculates the pearson correlation coefficients for all pairwise combination of all the features.
+    It then remove highly-correlated features and output the cleaned features.
+
+    :param: thresh: pearson correlation coefficient threashold above which features are classified as highly-correlated.
+    :param: clean01: If True, remove columns where all the values are equal to 0 or 1.
+    """
+    #calculate correlation coefficients for all pairwise combinations
+    df = features.corr()
+    
+    to_remove = []
+    for col in df.columns:
+        corr = df.index[df[col].between(thresh, 1.0, inclusive = 'both')].tolist()
+        if len(corr) > 1:
+            #print(col, corr)
+            to_remove.append(corr)
+    
+    to_remove2 = sum(to_remove,[])
+    #print(to_remove2)
+    
+    to_keep = set(df.columns) - set(to_remove2)    
+    features_cleaned = features[list(to_keep)]
+
+    if clean01 == True:
+        feats1 = features_cleaned.loc[:, (features_cleaned != 0).any(axis=0)]
+        feats2 = feats1.loc[:, (feats1 != 1).any(axis=0)]
+        log.info(feats2)
+        return feats2
+    
+    if clean01 == False:
+        log.info(features_cleaned)
+        return features_cleaned
+    
+
+def correlation_heatmap(features, annot=True):
+    """
+    This function plots the feature correlation matrix as a heatmap.
+    
+    :param features: a dataframe of features
+    :param annot: If True, annotate all pairwise correlation coefficients on the heatmap.
+    """
+
+    correlations = features.corr()
+
+    fig, ax = plt.subplots(figsize=(10,10))
+    sns.heatmap(correlations, vmin=-1.0, vmax=1.0, center=0, fmt='.2f',
+                square=True, linewidths=.5, 
+                annot=annot, 
+                cbar_kws={"shrink": .70},
+                cmap=sns.diverging_palette(220, 10, as_cmap=True))
+    plt.show()
+    
+
 
 def df_corr(x, y, corr_method):
     """

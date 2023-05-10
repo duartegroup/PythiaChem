@@ -20,6 +20,8 @@ from rdkit.Chem import AllChem
 from rdkit.Chem import rdMolDescriptors
 from rdkit.Chem.Draw import rdMolDraw2D
 from rdkit.Chem import DataStructs
+from rdkit.Chem.AllChem import GetHashedAtomPairFingerprintAsBitVect
+from rdkit.Chem.AllChem import GetHashedTopologicalTorsionFingerprintAsBitVect
 
 # disp
 from IPython.display import SVG, Image, display
@@ -57,7 +59,7 @@ def maccskeys_fingerprints(smiles):
     
     return fps
 
-def atom_pair_fingerprints(smiles, bit_vec=False, return_only_non_zero=False, log_explanation=False):
+def atom_pair_fingerprints(smiles, bit_vec=False, n_bits = 1024, return_only_non_zero=False, log_explanation=False):
     """
     Function to get atom pair fingerprints
     :param smiles: list - smiles representation of the molecules to make fingerprints of
@@ -71,7 +73,10 @@ def atom_pair_fingerprints(smiles, bit_vec=False, return_only_non_zero=False, lo
     mols = [gh.smiles_to_molcule(smile) for smile in smiles]
     
     if bit_vec is True:
-        fps = [Pairs.GetAtomPairFingerprintAsBitVect(mol) for mol in mols]
+        fps1 = [GetHashedAtomPairFingerprintAsBitVect(mol, nBits = n_bits) for mol in mols]
+        A = np.mat(fps1)
+        fps = pd.DataFrame(data = A)
+        
     else:
         fps = [Pairs.GetAtomPairFingerprint(mol) for mol in mols]
     
@@ -84,7 +89,7 @@ def atom_pair_fingerprints(smiles, bit_vec=False, return_only_non_zero=False, lo
     
     return fps
 
-def torsion_fingerprints(smiles, bit_vec=False, return_only_non_zero=False, log_explanation=False):
+def torsion_fingerprints(smiles, bit_vec=False, n_bits = 1024, return_only_non_zero=False, log_explanation=False):
     """
     Function to get topological fingerprints
     :param smiles: list - smiles representation of the molecules to make fingerprints of
@@ -98,7 +103,10 @@ def torsion_fingerprints(smiles, bit_vec=False, return_only_non_zero=False, log_
     mols = [gh.smiles_to_molcule(smile) for smile in smiles]
     
     if bit_vec is True:
-        fps = [Torsions.GetTopologicalTorsionFingerprintAsIntVect(mol) for mol in mols]
+        fps1 = [GetHashedTopologicalTorsionFingerprintAsBitVect(mol, nBits = n_bits) for mol in mols]
+        A = np.mat(fps1)
+        fps = pd.DataFrame(data = A)
+        
     else:
         fps = [rdMolDescriptors.GetTopologicalTorsionFingerprint(mol) for mol in mols]
     
