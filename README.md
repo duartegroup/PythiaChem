@@ -15,7 +15,7 @@ Simple ML tool
 We are working on populating this package with more models and other building blocks.
 
 ## Installation
-### Install by conda
+To use Pythia, you need to install several third-party softwares including rdkit, sklearn, mordred, etc.
 ```Bash
 conda create -n pythia
 conda activate pythia
@@ -27,4 +27,9 @@ pip install 'mordred[full]'
 pip install seaborn
 pip install scikit-plot
 pip install "dask[complete]"
+```
+
+```Bash
+Git clone https://github.com/duartegroup/Pythia.git
+pip install .
 ```
