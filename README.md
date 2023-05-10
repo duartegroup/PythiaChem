@@ -28,9 +28,8 @@ pip install seaborn
 pip install scikit-plot
 pip install notebook
 ```
-
-```Bash
 To make environment available in jupyter notebook
+```Bash
 conda install -c anaconda ipykernel
 python -m ipykernel install --user --name=pythia
 ```
