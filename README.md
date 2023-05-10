@@ -26,7 +26,6 @@ pip install mlxtend
 pip install 'mordred[full]'
 pip install seaborn
 pip install scikit-plot
-pip install "dask[complete]"
 pip install notebook
 ```
 
