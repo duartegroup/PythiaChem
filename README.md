@@ -27,9 +27,17 @@ pip install 'mordred[full]'
 pip install seaborn
 pip install scikit-plot
 pip install "dask[complete]"
+pip install notebook
 ```
 
 ```Bash
-Git clone https://github.com/duartegroup/Pythia.git
+To make environment available in jupyter notebook
+conda install -c anaconda ipykernel
+python -m ipykernel install --user --name=pythia
+```
+
+### Installation by pip
+```Bash
+git clone https://github.com/duartegroup/Pythia.git
 pip install .
 ```
