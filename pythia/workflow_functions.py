@@ -50,7 +50,7 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler, MinMaxScaler
 from imblearn.over_sampling import SMOTE, SMOTENC, SMOTEN
 from imblearn.metrics import classification_report_imbalanced, sensitivity_specificity_support
 
-
+import shap
 import math
 
 # Own modules
@@ -553,7 +553,7 @@ def split_test_regressors_with_optimization(df, targets, test_df, test_targets, 
     """
 
     log = logging.getLogger(__name__)
-    all_test_metrics = []
+    all_test_metrics,p = [],[]
     iteration = 0
 
     if rgs_names is None:
@@ -601,6 +601,7 @@ def split_test_regressors_with_optimization(df, targets, test_df, test_targets, 
         test_predictions = reg.predict(Xtest)
         log.info("\n\t The predictions are: {}".format(test_predictions))
 
+
         #         Calculate metrics for regression
         test_metrics = {}
         test_metrics['name'] = name
@@ -623,12 +624,63 @@ def split_test_regressors_with_optimization(df, targets, test_df, test_targets, 
         plt.yticks(np.arange(0, 12, step=2))
         plt.savefig('{}/{}.png'.format(name, name))
 
+        for i,j in zip(ytest,test_predictions):
+            p.append([i,j])
+        pred = pd.DataFrame(p, columns = ['actual','predicted'])
+        pred.to_csv("{}/predictions.csv".format(name), index=False)
+        del p[:]
+
     all_test_metrics = pd.DataFrame(all_test_metrics)
     all_test_metrics.to_csv('test_metrics.csv')
 
-def kfold_test_classifiers_with_optimization(df, classes, classifiers, clf_options, scale=True, cv=5, n_repeats=20, clf_names=None,
-                                                        class_labels=(0,1), no_train_output=False, test_set_size=0.2, smiles=None, names=None,
-                                                        random_seed=107901, overwrite=False):
+
+def ensemble(csv_files):
+    log = logging.getLogger(__name__)
+    predicted_values = []
+
+    ensemble_metrics = {}
+    # Read predicted values from each CSV file
+    for file in csv_files:
+        log.info("\n\t Reading:{} ".format(file))
+        data = pd.read_csv(file)
+        predicted_values.append(data['predicted'])
+
+    log.info("\n\t Gathered all predictions ")
+    # Calculate mean value of predicted values
+    mean_predicted = np.mean(predicted_values, axis=0)
+
+    # Get actual values from the first CSV file
+    actual = pd.read_csv(csv_files[0])['actual']
+    log.info("\n\tCalculating metrics")
+    # Calculate regression metrics
+    mae = mean_absolute_error(actual, mean_predicted)
+    mse = mean_squared_error(actual, mean_predicted)
+    rmse = np.sqrt(mse)
+    r2 = r2_score(actual, mean_predicted)
+
+    ensemble_metrics['mae'] = mae
+    ensemble_metrics['mse'] = mse
+    ensemble_metrics['rmse'] = rmse
+    ensemble_metrics['r2'] = r2
+
+    plt.figure(figsize=(6, 4))
+    plt.scatter(actual, mean_predicted, color='blue', marker='x')
+    plt.ylabel('Predicted Δ∆$G^{‡}$ (kJ/mol)', fontsize=13)
+    plt.xlabel('Experimental Δ∆$G^{‡}$ (kJ/mol)', fontsize=13)
+    plt.plot([-0.05, 11], [-0.05, 11], "k:")
+
+    plt.xticks(np.arange(0, 12, step=2))
+    plt.yticks(np.arange(0, 12, step=2))
+
+
+    return ensemble_metrics
+
+
+def kfold_test_classifiers_with_optimization(df, classes, classifiers, clf_options, scale=True, cv=5, n_repeats=20,
+                                             clf_names=None,
+                                             class_labels=(0, 1), no_train_output=False, test_set_size=0.2, smiles=None,
+                                             names=None,
+                                             random_seed=107901, overwrite=False):
     """
     function to run classification test over classifiers using imbalenced resampling
     inspired from https://scikit-learn.org/stable/auto_examples/classification/plot_classifier_comparison.html
@@ -637,103 +689,105 @@ def kfold_test_classifiers_with_optimization(df, classes, classifiers, clf_optio
     :param classifiers: list - list of classifier methods
     :param plot: true/false - plot the results or not
     """
-    
+
     log = logging.getLogger(__name__)
-    
+
     log.info("Features: {}".format(df.columns))
-    
+
     log_df = pd.DataFrame()
     labelpredictions = pd.DataFrame()
-    
-    list_report, list_roc_auc, list_opt_param, list_score, list_c_matrix=[],[],[],[],[]
-    list_average_roc_auc,list_average_scores=[],[]
-    disp,predictions,actual,index,same = [], [], [],[],[]
-    probablity=[]
-    
+
+    list_report, list_roc_auc, list_opt_param, list_score, list_c_matrix = [], [], [], [], []
+    list_average_roc_auc, list_average_scores = [], []
+    disp, predictions, actual, index, same = [], [], [], [], []
+    probablity = []
+
     iteration = 0
     pd.set_option('display.max_columns', 20)
     data = df.copy()
     log.info("Features: {}".format(data))
     data.reset_index(inplace=True)
-        
+
     if clf_names is None:
         clf_names = [i for i in range(0, len(classifiers))]
-    
+
     if scale is True:
         data = scaling.minmaxscale(data)
         log.info("Scaled data:\n{}".format(data))
     else:
         log.info("Using unscaled features")
-    
+
     # Kfold n_repeats is the number of folds to run.
-    # Setting the random seed determines the degree of randomness. This means run n_repeats of 
+    # Setting the random seed determines the degree of randomness. This means run n_repeats of
     # independent cross validators.
     kf = KFold(n_splits=n_repeats, shuffle=True, random_state=random_seed)
-    log.info("Starting classification: NOTE on confusion matrix - In binary classification, true negatives is element 0,0, "
-             "false negatives is element 1,0, true positives is element 1,1 and false positives is element 0,1")
+    log.info(
+        "Starting classification: NOTE on confusion matrix - In binary classification, true negatives is element 0,0, "
+        "false negatives is element 1,0, true positives is element 1,1 and false positives is element 0,1")
     for name, classf in zip(clf_names, classifiers):
         log.info("\n-----\nBegin {}\n-----\n".format(name))
-        
+
         kf_iteration = 0
         if not n_repeats % 2:
-            figure = plt.figure(figsize=(2 * 20.0, 5.0 * int(n_repeats/2.0)))
-            plt_rows = int(n_repeats/2.0)
+            figure = plt.figure(figsize=(2 * 20.0, 5.0 * int(n_repeats / 2.0)))
+            plt_rows = int(n_repeats / 2.0)
         else:
-            figure = plt.figure(figsize=(2 * 20.0, 5.0 * int(n_repeats/2.0)+1))
-            plt_rows = int(n_repeats/2.0)+1
+            figure = plt.figure(figsize=(2 * 20.0, 5.0 * int(n_repeats / 2.0) + 1))
+            plt_rows = int(n_repeats / 2.0) + 1
         scores = []
         confusion_matrices = []
         roc_aucs = []
         score_list = []
         tmp = []
         name = "{}".format("_".join(name.split()))
-        
+
         # Make directory for each classifier
         if not os.path.isdir(name):
-            os.makedirs(name, exist_ok = True)
+            os.makedirs(name, exist_ok=True)
         elif overwrite is False and os.path.isdir(name) is True:
             log.warning("Directory already exists and overwrite is False will stop before overwriting.".format(name))
             return None
         else:
             log.info("Directory {} already exists will be overwritten".format(name))
-        
-        # Loop over  Kfold here 
+
+        # Loop over  Kfold here
         for train_indx, test_indx in kf.split(df):
             log.info("----- {}: Fold {} -----".format(name, kf_iteration))
-            
+
             tmp = tmp + test_indx.tolist()
             log.info(test_indx.tolist())
-            
+
             # Set the training and testing sets by train test index
             log.info("\tTrain indx {}\n\tTest indx: {}".format(train_indx, test_indx))
-            
+
             # Train
             Xtrain = df.iloc[train_indx]
             log.debug("Train X\n{}".format(Xtrain))
             ytrain = classes.iloc[train_indx]
             log.debug("Train Y\n{}".format(ytrain))
-            
+
             # Test
             Xtest = df.iloc[test_indx]
             log.debug("Test X\n{}".format(Xtest))
             ytest = classes.iloc[test_indx]
             log.debug("Test Y\n{}".format(ytest))
-            
+
             # way to calculate the test indexes
-            #test_i = np.array(list(set(df.index) - set(train_indx)))
+            # test_i = np.array(list(set(df.index) - set(train_indx)))
 
             # Grid search model optimizer
-            opt_param = grid_search_classifier_parameters(classf, Xtrain, ytrain, clf_options, clf_names, iteration, no_train_output, cv=cv, name=name)
-            
+            opt_param = grid_search_classifier_parameters(classf, Xtrain, ytrain, clf_options, clf_names, iteration,
+                                                          no_train_output, cv=cv, name=name)
+
             list_opt_param.append(opt_param)
-            
+
             # Fit final model using optimized parameters
             clf = classf
             clf.set_params(**opt_param)
             log.info("\n\t----- Predicting using: {} -----".format(name))
             log.debug("\tXtrain: {}\n\tXtest: {}\n\tytrain: {}\n\tytest: {}".format(Xtrain, Xtest, ytrain, ytest))
             clf.fit(Xtrain, ytrain.values.ravel())
-            
+
             # Evaluate the model
             ## evaluate the model on multiple metric score as list for averaging
             predicted_clf = clf.predict(Xtest)
@@ -741,47 +795,54 @@ def kfold_test_classifiers_with_optimization(df, classes, classifiers, clf_optio
             sc_df = pd.DataFrame(data=np.array(sc).T, columns=["precision", "recall", "f1score", "support"])
             sc_df.to_csv(os.path.join(name, "fold_{}_score.csv".format(kf_iteration)))
             score_list.append(sc)
-            
+
             ## evaluate the principle score metric only (incase different to those above although this is unlikely)
             clf_score = clf.score(Xtest, ytest)
             scores.append(clf_score)
-            
-            ## Get the confusion matrices 
+
+            ## Get the confusion matrices
             c_matrix = confusion_matrix(ytest, predicted_clf, labels=class_labels)
             confusion_matrices.append(c_matrix)
-            
+
             ## Calculate the roc area under the curve
             probs = clf.predict_proba(Xtest)
-            fpr, tpr, thresholds = roc_curve(ytest, probs[:,1], pos_label=1)
+            fpr, tpr, thresholds = roc_curve(ytest, probs[:, 1], pos_label=1)
             roc_auc = auc(fpr, tpr)
-            
+
             list_roc_auc.append(roc_auc)
-            
+
             roc_aucs.append(roc_auc)
             log.info("\tROC analysis area under the curve: {}".format(roc_auc))
-            
+
             # output metrics for consideration
             log.info("\tConfusion matrix ({}):\n{}\n".format(name, c_matrix))
-            
+
             list_c_matrix.append(c_matrix)
-            log.info("\n\tscore ({}): {}".format(name, clf_score))   
+            log.info("\n\tscore ({}): {}".format(name, clf_score))
 
             list_score.append(clf_score)
-        
+
             log.info("\tImbalence reports:")
-            log.info("\tImbalence classification report:\n{}".format(classification_report_imbalanced(ytest, predicted_clf)))
+            log.info(
+                "\tImbalence classification report:\n{}".format(classification_report_imbalanced(ytest, predicted_clf)))
             output_dict = classification_report_imbalanced(ytest, predicted_clf, output_dict=True)
-            
+
             ## Plot the roc curves
-            ax = plt.subplot(2, plt_rows, kf_iteration+1)
+            ax = plt.subplot(2, plt_rows, kf_iteration + 1)
             ax.plot(fpr, tpr, color="red",
-                     lw=1.5, label="ROC curve (auc = {:.2f})".format(roc_auc))
-            
-                # ugliest legend i ve made in my life - maybe one under the other?
-            
-            ax.plot(fpr, tpr, alpha=0.0,color="white", lw=1.5,label= "pre_class0 = {:.2f}\n".format(output_dict[0]['pre'])+"pre_class1 = {:.2f}".format(output_dict[1]['pre']))
-            ax.plot(fpr, tpr, alpha=0.0,color="white", lw=1.5,label= "f1_class0 = {:.2f}\n".format(output_dict[0]['f1'])+ "f1_class1 = {:.2f}".format(output_dict[1]['f1']))
-            ax.plot(fpr, tpr, alpha=0.0,color="white", lw=1.5,label= "rec_class0 = {:.2f}\n".format(output_dict[0]['rec'])+ "rec_class1 = {:.2f}".format(output_dict[1]['rec']))
+                    lw=1.5, label="ROC curve (auc = {:.2f})".format(roc_auc))
+
+            # ugliest legend i ve made in my life - maybe one under the other?
+
+            ax.plot(fpr, tpr, alpha=0.0, color="white", lw=1.5,
+                    label="pre_class0 = {:.2f}\n".format(output_dict[0]['pre']) + "pre_class1 = {:.2f}".format(
+                        output_dict[1]['pre']))
+            ax.plot(fpr, tpr, alpha=0.0, color="white", lw=1.5,
+                    label="f1_class0 = {:.2f}\n".format(output_dict[0]['f1']) + "f1_class1 = {:.2f}".format(
+                        output_dict[1]['f1']))
+            ax.plot(fpr, tpr, alpha=0.0, color="white", lw=1.5,
+                    label="rec_class0 = {:.2f}\n".format(output_dict[0]['rec']) + "rec_class1 = {:.2f}".format(
+                        output_dict[1]['rec']))
 
             ax.plot([0, 1], [0, 1], "k:")
             ax.set_xlim(xmin=0.0, xmax=1.01)
@@ -789,64 +850,68 @@ def kfold_test_classifiers_with_optimization(df, classes, classifiers, clf_optio
             ax.set_xlabel('False Positive Rate')
             ax.set_ylabel('True Positive Rate')
             ax.legend(loc="lower right")
-            
-                   
+
             list_report.append(classification_report_imbalanced(ytest, predicted_clf))
-            
+
             sensitvity, specificity, support = sensitivity_specificity_support(ytest, predicted_clf)
             log.debug("\t{} {} {}".format(sensitvity, specificity, support))
             log.info("\t Index | Predicted | Label\n\t------------------")
-            log.info("\t{}\n-----\n".format("\n\t".join(["{}   |   {}   |   {}".format(i, p, k) for i, p, k in zip(test_indx, predicted_clf, ytest["classes"].values)])))
-    
-            pred = [list(test_indx),list(ytest["classes"].values),list(predicted_clf), list(probs[:,0]), list(probs[:,1])]
-            
+            log.info("\t{}\n-----\n".format("\n\t".join(["{}   |   {}   |   {}".format(i, p, k) for i, p, k in
+                                                         zip(test_indx, predicted_clf, ytest["classes"].values)])))
+
+            pred = [list(test_indx), list(ytest["classes"].values), list(predicted_clf), list(probs[:, 0]),
+                    list(probs[:, 1])]
+
             pred = pd.DataFrame(pred)
             pred.T.to_csv("{}/{}.csv".format(name, kf_iteration))
             kf_iteration = kf_iteration + 1
-        
+
         del predictions[:]
-        
+
         if any(x not in tmp for x in [y for y in range(len(classes.index))]):
-             log.info("WARNING there appears to be left over indexes which have not been used for testing: {}".format())
+            log.info("WARNING there appears to be left over indexes which have not been used for testing: {}".format())
         else:
             log.info("All points have been used in a test case over all fold as they should have been")
-        
+
         # Plot and assess classifier over all folds
-        
+
         # NOTE - rows are scores columns are classes
         average_scores = np.mean(score_list, axis=0)
         std_scores = np.std(score_list, axis=0)
         average_roc_auc = np.mean(roc_aucs, axis=0)
         std_roc_auc = np.std(roc_aucs, axis=0)
-        
+
         log.info("{} {} {} {}".format(average_scores, std_scores, average_roc_auc, std_roc_auc))
 
         # precision_recall_fscore_support
-        score_str1 = "Class 0: Pre: {:.2f} +/- {:.2f} Rec: {:.2f} +/- {:.2f} Fsc: {:.2f} +/- {:.2f} Sup: {:.2f} +/- {:.2f}".format(average_scores[0][0], 
-                                                                                                                                   std_scores[0][0], 
-                                                                                                                                   average_scores[1][0], 
-                                                                                                                                   std_scores[1][0], 
-                                                                                                                                   average_scores[2][0], 
-                                                                                                                                   std_scores[2][0], 
-                                                                                                                                   average_scores[3][0], 
-                                                                                                                                   std_scores[3][0])
-        score_str2 = "Class 1: Pre: {:.2f} +/- {:.2f} Rec: {:.2f} +/- {:.2f} Fsc: {:.2f} +/- {:.2f} Sup: {:.2f} +/- {:.2f}".format(average_scores[0][1], 
-                                                                                                                                   std_scores[0][1], 
-                                                                                                                                   average_scores[1][1], 
-                                                                                                                                   std_scores[1][1], 
-                                                                                                                                   average_scores[2][1], 
-                                                                                                                                   std_scores[2][1], 
-                                                                                                                                   average_scores[3][1], 
-                                                                                                                                   std_scores[3][1])
-        score_str3 ="Average ROC AUCs: {:.2f} +/- {:.2f}".format(average_roc_auc, std_roc_auc)
+        score_str1 = "Class 0: Pre: {:.2f} +/- {:.2f} Rec: {:.2f} +/- {:.2f} Fsc: {:.2f} +/- {:.2f} Sup: {:.2f} +/- {:.2f}".format(
+            average_scores[0][0],
+            std_scores[0][0],
+            average_scores[1][0],
+            std_scores[1][0],
+            average_scores[2][0],
+            std_scores[2][0],
+            average_scores[3][0],
+            std_scores[3][0])
+        score_str2 = "Class 1: Pre: {:.2f} +/- {:.2f} Rec: {:.2f} +/- {:.2f} Fsc: {:.2f} +/- {:.2f} Sup: {:.2f} +/- {:.2f}".format(
+            average_scores[0][1],
+            std_scores[0][1],
+            average_scores[1][1],
+            std_scores[1][1],
+            average_scores[2][1],
+            std_scores[2][1],
+            average_scores[3][1],
+            std_scores[3][1])
+        score_str3 = "Average ROC AUCs: {:.2f} +/- {:.2f}".format(average_roc_auc, std_roc_auc)
         score_text = "{}\n{}\n{}".format(score_str1, score_str2, score_str3)
-        plt.annotate(score_text, xy=(0.5, 0), xytext=(0, 0), xycoords="figure fraction", textcoords='offset points', size=12, ha='center', va='bottom')
+        plt.annotate(score_text, xy=(0.5, 0), xytext=(0, 0), xycoords="figure fraction", textcoords='offset points',
+                     size=12, ha='center', va='bottom')
         figure.tight_layout()
         plt.savefig("{0}/{0}_roc_curves.png".format(name))
         plt.show()
 
         iteration = iteration + 1
-    
+
     log_df["opt_param"] = pd.Series(list_opt_param)
     log_df["roc_auc"] = pd.Series(list_roc_auc)
 
@@ -854,8 +919,267 @@ def kfold_test_classifiers_with_optimization(df, classes, classifiers, clf_optio
     log_df["score"] = pd.Series(list_score)
 
     log_df["c_matrix"] = pd.Series(list_c_matrix)
-    
-    # log_df.to_csv("logs2.csv")
+
+
+def kfold_test_classifiers_with_optimization_and_shap(X, y, classifiers, clf_options, scale=True, cv=5, n_repeats=20,
+                                                      clf_names=None,
+                                                      class_labels=(0, 1), no_train_output=False, test_set_size=0.2,
+                                                      smiles=None,
+                                                      names=None,
+                                                      random_seed=107901, overwrite=False):
+    """
+    function to run classification test over classifiers using imbalenced resampling
+    inspired from https://scikit-learn.org/stable/auto_examples/classification/plot_classifier_comparison.html
+    :param df: dataframe - data frame of features and identifers (smiles and/or names)
+    :param classes: iterable - list of classes/labels
+    :param classifiers: list - list of classifier methods
+    :param plot: true/false - plot the results or not
+    """
+
+    log = logging.getLogger(__name__)
+
+    log.info("Features: {}".format(X.columns))
+    columns = X.columns
+    log_df = pd.DataFrame()
+    labelpredictions = pd.DataFrame()
+
+    list_report, list_roc_auc, list_opt_param, list_score, list_c_matrix = [], [], [], [], []
+    list_average_roc_auc, list_average_scores = [], []
+    disp, predictions, actual, index, same = [], [], [], [], []
+    probablity = []
+
+    iteration = 0
+    pd.set_option('display.max_columns', 20)
+    data = X.copy()
+    log.info("Features: {}".format(data))
+    data.reset_index(inplace=True)
+
+    if clf_names is None:
+        clf_names = [i for i in range(0, len(classifiers))]
+
+    if scale is True:
+        data = scaling.minmaxscale(data)
+        log.info("Scaled data:\n{}".format(data))
+    else:
+        log.info("Using unscaled features")
+
+    # Kfold n_repeats is the number of folds to run.
+    # Setting the random seed determines the degree of randomness. This means run n_repeats of
+    # independent cross validators.
+    kf = KFold(n_splits=n_repeats, shuffle=True, random_state=random_seed)
+    log.info(
+        "Starting classification: NOTE on confusion matrix - In binary classification, true negatives is element 0,0, "
+        "false negatives is element 1,0, true positives is element 1,1 and false positives is element 0,1")
+    for name, classf in zip(clf_names, classifiers):
+        log.info("\n-----\nBegin {}\n-----\n".format(name))
+
+        kf_iteration = 0
+        if not n_repeats % 2:
+            figure = plt.figure(figsize=(2 * 20.0, 5.0 * int(n_repeats / 2.0)))
+            plt_rows = int(n_repeats / 2.0)
+        else:
+            figure = plt.figure(figsize=(2 * 20.0, 5.0 * int(n_repeats / 2.0) + 1))
+            plt_rows = int(n_repeats / 2.0) + 1
+        scores = []
+        confusion_matrices = []
+        roc_aucs = []
+        score_list = []
+        tmp = []
+        name = "{}".format("_".join(name.split()))
+
+        # Make directory for each classifier
+        if not os.path.isdir(name):
+            os.makedirs(name, exist_ok=True)
+        elif overwrite is False and os.path.isdir(name) is True:
+            log.warning("Directory already exists and overwrite is False will stop before overwriting.".format(name))
+            return None
+        else:
+            log.info("Directory {} already exists will be overwritten".format(name))
+
+        # Loop over  Kfold here
+        list_shap_values = list()
+        list_test_sets = list()
+
+        for train_indx, test_indx in kf.split(X):
+            log.info("----- {}: Fold {} -----".format(name, kf_iteration))
+
+            tmp = tmp + test_indx.tolist()
+            log.info(test_indx.tolist())
+
+            # Set the training and testing sets by train test index
+            log.info("\tTrain indx {}\n\tTest indx: {}".format(train_indx, test_indx))
+
+            X_train, X_test = X.iloc[train_indx], X.iloc[test_indx]
+            y_train, y_test = y.iloc[train_indx], y.iloc[test_indx]
+            X_train = pd.DataFrame(X_train, columns=columns)
+            X_test = pd.DataFrame(X_test, columns=columns)
+
+            # Grid search model optimizer
+            opt_param = grid_search_classifier_parameters(classf, X_train, y_train, clf_options, clf_names,
+                                                              iteration,
+                                                              no_train_output, cv=cv, name=name)
+
+            list_opt_param.append(opt_param)
+
+            # Fit final model using optimized parameters
+            clf = classf
+            clf.set_params(**opt_param)
+            log.info("\n\t----- Predicting using: {} -----".format(name))
+            clf.fit(X_train, y_train)
+
+            #             if clf is tree
+
+            # explaining model
+            explainer = shap.KernelExplainer(clf.predict_proba, X_train)
+            shap_values = explainer.shap_values(X_test)
+            # for each iteration we save the test_set index and the shap_values
+            list_shap_values.append(shap_values)
+            list_test_sets.append(test_indx)
+
+            # Evaluate the model
+            ## evaluate the model on multiple metric score as list for averaging
+            predicted_clf = clf.predict(X_test)
+            sc = precision_recall_fscore_support(y_test, predicted_clf, average=None)
+            sc_df = pd.DataFrame(data=np.array(sc).T, columns=["precision", "recall", "f1score", "support"])
+            sc_df.to_csv(os.path.join(name, "fold_{}_score.csv".format(kf_iteration)))
+            score_list.append(sc)
+
+            ## evaluate the principle score metric only (incase different to those above although this is unlikely)
+            clf_score = clf.score(X_test, y_test)
+            scores.append(clf_score)
+
+            ## Get the confusion matrices
+            c_matrix = confusion_matrix(y_test, predicted_clf, labels=class_labels)
+            confusion_matrices.append(c_matrix)
+
+            ## Calculate the roc area under the curve
+            probs = clf.predict_proba(X_test)
+            fpr, tpr, thresholds = roc_curve(y_test, probs[:, 1], pos_label=1)
+            roc_auc = auc(fpr, tpr)
+
+            list_roc_auc.append(roc_auc)
+
+            roc_aucs.append(roc_auc)
+            log.info("\tROC analysis area under the curve: {}".format(roc_auc))
+
+            # output metrics for consideration
+            log.info("\tConfusion matrix ({}):\n{}\n".format(name, c_matrix))
+
+            list_c_matrix.append(c_matrix)
+            log.info("\n\tscore ({}): {}".format(name, clf_score))
+
+            list_score.append(clf_score)
+
+            log.info("\tImbalence reports:")
+            log.info(
+                "\tImbalence classification report:\n{}".format(
+                    classification_report_imbalanced(y_test, predicted_clf)))
+            output_dict = classification_report_imbalanced(y_test, predicted_clf, output_dict=True)
+
+            ## Plot the roc curves
+            ax = plt.subplot(2, plt_rows, kf_iteration + 1)
+            ax.plot(fpr, tpr, color="red",
+                    lw=1.5, label="ROC curve (auc = {:.2f})".format(roc_auc))
+
+            # ugliest legend i ve made in my life - maybe one under the other?
+
+            ax.plot(fpr, tpr, alpha=0.0, color="white", lw=1.5,
+                    label="pre_class0 = {:.2f}\n".format(output_dict[0]['pre']) + "pre_class1 = {:.2f}".format(
+                        output_dict[1]['pre']))
+            ax.plot(fpr, tpr, alpha=0.0, color="white", lw=1.5,
+                    label="f1_class0 = {:.2f}\n".format(output_dict[0]['f1']) + "f1_class1 = {:.2f}".format(
+                        output_dict[1]['f1']))
+            ax.plot(fpr, tpr, alpha=0.0, color="white", lw=1.5,
+                    label="rec_class0 = {:.2f}\n".format(output_dict[0]['rec']) + "rec_class1 = {:.2f}".format(
+                        output_dict[1]['rec']))
+
+            ax.plot([0, 1], [0, 1], "k:")
+            ax.set_xlim(xmin=0.0, xmax=1.01)
+            ax.set_ylim(ymin=0.0, ymax=1.01)
+            ax.set_xlabel('False Positive Rate')
+            ax.set_ylabel('True Positive Rate')
+            ax.legend(loc="lower right")
+
+            list_report.append(classification_report_imbalanced(y_test, predicted_clf))
+
+            sensitvity, specificity, support = sensitivity_specificity_support(y_test, predicted_clf)
+            log.debug("\t{} {} {}".format(sensitvity, specificity, support))
+            log.info("\t Index | Predicted | Label\n\t------------------")
+            log.info("\t{}\n-----\n".format("\n\t".join(["{}   |   {}   |   {}".format(i, p, k) for i, p, k in
+                                                         zip(test_indx, predicted_clf, y_test["classes"].values)])))
+
+            pred = [list(test_indx), list(y_test["classes"].values), list(predicted_clf), list(probs[:, 0]),
+                    list(probs[:, 1])]
+
+            pred = pd.DataFrame(pred)
+            pred.T.to_csv("{}/{}.csv".format(name, kf_iteration))
+            kf_iteration = kf_iteration + 1
+
+        # combining results from all iterations
+        test_set = list_test_sets[0]
+        shap_values = np.array(list_shap_values[0])
+        for i in range(1, len(list_test_sets)):
+                test_set = np.concatenate((test_set, list_test_sets[i]), axis=0)
+                shap_values = np.concatenate((shap_values, np.array(list_shap_values[i])), axis=1)
+            # bringing back variable names
+        X_test = pd.DataFrame(X.iloc[test_set], columns=columns)
+        shap.summary_plot(shap_values[1], X_test)
+        # plt.savefig("{0}/{0}_shap.png".format(name))
+
+        del predictions[:]
+
+        if any(x not in tmp for x in [y for y in range(len(y.index))]):
+            log.info("WARNING there appears to be left over indexes which have not been used for testing: {}".format())
+        else:
+            log.info("All points have been used in a test case over all fold as they should have been")
+
+        # Plot and assess classifier over all folds
+
+        # NOTE - rows are scores columns are classes
+        average_scores = np.mean(score_list, axis=0)
+        std_scores = np.std(score_list, axis=0)
+        average_roc_auc = np.mean(roc_aucs, axis=0)
+        std_roc_auc = np.std(roc_aucs, axis=0)
+
+        log.info("{} {} {} {}".format(average_scores, std_scores, average_roc_auc, std_roc_auc))
+
+        # precision_recall_fscore_support
+        score_str1 = "Class 0: Pre: {:.2f} +/- {:.2f} Rec: {:.2f} +/- {:.2f} Fsc: {:.2f} +/- {:.2f} Sup: {:.2f} +/- {:.2f}".format(
+            average_scores[0][0],
+            std_scores[0][0],
+            average_scores[1][0],
+            std_scores[1][0],
+            average_scores[2][0],
+            std_scores[2][0],
+            average_scores[3][0],
+            std_scores[3][0])
+        score_str2 = "Class 1: Pre: {:.2f} +/- {:.2f} Rec: {:.2f} +/- {:.2f} Fsc: {:.2f} +/- {:.2f} Sup: {:.2f} +/- {:.2f}".format(
+            average_scores[0][1],
+            std_scores[0][1],
+            average_scores[1][1],
+            std_scores[1][1],
+            average_scores[2][1],
+            std_scores[2][1],
+            average_scores[3][1],
+            std_scores[3][1])
+        score_str3 = "Average ROC AUCs: {:.2f} +/- {:.2f}".format(average_roc_auc, std_roc_auc)
+        score_text = "{}\n{}\n{}".format(score_str1, score_str2, score_str3)
+        plt.annotate(score_text, xy=(0.5, 0), xytext=(0, 0), xycoords="figure fraction", textcoords='offset points',
+                     size=12, ha='center', va='bottom')
+        figure.tight_layout()
+        plt.savefig("{0}/{0}_roc_curves.png".format(name))
+        plt.show()
+
+        iteration = iteration + 1
+
+    log_df["opt_param"] = pd.Series(list_opt_param)
+    log_df["roc_auc"] = pd.Series(list_roc_auc)
+
+    log_df["report"] = pd.Series(list_report)
+    log_df["score"] = pd.Series(list_score)
+
+    log_df["c_matrix"] = pd.Series(list_c_matrix)
+
 
 
 def test_classifiers_with_optimization(df, test_df, classes, testclasses, classifiers, clf_options, overwrite=False, scale=False, cv=5,
