@@ -30,7 +30,7 @@ We are working on populating this package with more models and other building bl
 - classification-DFT: classification with DFT descriptors, synthetic data, data set split, interpretability
 
 Please mix and match Notebook cells and Modules. The world is your oyster, the sky is the limit.
-Use the .csv files to run the Notebooks.
+Use the .csv files to run the Notebooks and use the comments to assist you.
 
 ## Installation
 To use Pythia, you need to install several third-party softwares including rdkit, sklearn, mordred, etc.
