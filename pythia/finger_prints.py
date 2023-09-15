@@ -20,6 +20,7 @@ from rdkit.Chem import AllChem
 from rdkit.Chem import rdMolDescriptors
 from rdkit.Chem.Draw import rdMolDraw2D
 from rdkit.Chem import DataStructs
+from rdkit.Chem.AllChem import GetHashedAtomPairFingerprintAsBitVect
 
 # disp
 from IPython.display import SVG, Image, display
@@ -57,10 +58,11 @@ def maccskeys_fingerprints(smiles):
     df = pd.DataFrame(data=A)
     return fps,df
 
-def atom_pair_fingerprints(smiles, bit_vec=False, return_only_non_zero=False, log_explanation=False):
+def atom_pair_fingerprints(smiles, nBits = 1024, bit_vec=False, return_only_non_zero=False, log_explanation=False):
     """
     Function to get atom pair fingerprints
     :param smiles: list - smiles representation of the molecules to make fingerprints of
+    :param nBits: number of bits for the bit vector representation of the fingerprint
     :param bit_vec: true/false - get the bit vector representation of the fingerprint
     :param return_only_non_zero: true/false - get only the non-zero elements of the fingerprint as it is sparse
     :param log_explanation: true/false - print an explanation of the bit see http://www.rdkit.org/docs/GettingStartedInPython.html#atom-pairs-and-topological-torsions
@@ -71,7 +73,8 @@ def atom_pair_fingerprints(smiles, bit_vec=False, return_only_non_zero=False, lo
     mols = [mi.smiles_to_molcule(smile) for smile in smiles]
     
     if bit_vec is True:
-        fps = [Pairs.GetAtomPairFingerprintAsBitVect(mol) for mol in mols]
+        #fps = [Pairs.GetAtomPairFingerprintAsBitVect(mol) for mol in mols]
+        fps = [GetHashedAtomPairFingerprintAsBitVect(mol, nBits = nBits) for mol in mols]
     else:
         fps = [Pairs.GetAtomPairFingerprint(mol) for mol in mols]
     
@@ -84,10 +87,11 @@ def atom_pair_fingerprints(smiles, bit_vec=False, return_only_non_zero=False, lo
     
     return fps
 
-def torsion_fingerprints(smiles, bit_vec=False, return_only_non_zero=False, log_explanation=False):
+def torsion_fingerprints(smiles, nBits = 1024, bit_vec=False, return_only_non_zero=False, log_explanation=False):
     """
     Function to get topological fingerprints
     :param smiles: list - smiles representation of the molecules to make fingerprints of
+    :param nBits: number of bits for the bit vector representation of the fingerprint
     :param bit_vec: true/false - get the bit vector representation of the fingerprint
     :param return_only_non_zero: true/false - get only the non-zero elements of the fingerprint as it is sparse
     :param log_explanation: true/false - print an explanation of the bit see http://www.rdkit.org/docs/GettingStartedInPython.html#atom-pairs-and-topological-torsions
@@ -98,7 +102,7 @@ def torsion_fingerprints(smiles, bit_vec=False, return_only_non_zero=False, log_
     mols = [mi.smiles_to_molcule(smile) for smile in smiles]
     
     if bit_vec is True:
-        fps = [Torsions.GetTopologicalTorsionFingerprintAsIntVect(mol) for mol in mols]
+        fps = [rdMolDescriptors.GetHashedTopologicalTorsionFingerprintAsBitVect(mol, nBits = nBits) for mol in mols]
     else:
         fps = [rdMolDescriptors.GetTopologicalTorsionFingerprint(mol) for mol in mols]
     

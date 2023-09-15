@@ -20,6 +20,7 @@ from rdkit import DataStructs
 
 # scikit-learn
 from sklearn.model_selection import train_test_split, GridSearchCV, cross_validate, KFold
+from sklearn.compose import ColumnTransformer
 from sklearn.feature_selection import RFECV, RFE
 from sklearn import metrics
 from sklearn.preprocessing import MinMaxScaler
@@ -34,7 +35,7 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler # This is sklearns auto-scaling function
-from sklearn.metrics import confusion_matrix,ConfusionMatrixDisplay,plot_confusion_matrix
+from sklearn.metrics import confusion_matrix,ConfusionMatrixDisplay #, plot_confusion_matrix
 from sklearn.metrics import classification_report
 from sklearn.metrics import average_precision_score
 from sklearn.metrics import classification_report
@@ -50,7 +51,7 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler, MinMaxScaler
 from imblearn.over_sampling import SMOTE, SMOTENC, SMOTEN
 from imblearn.metrics import classification_report_imbalanced, sensitivity_specificity_support
 
-import shap
+
 import math
 
 # Own modules
@@ -553,7 +554,7 @@ def split_test_regressors_with_optimization(df, targets, test_df, test_targets, 
     """
 
     log = logging.getLogger(__name__)
-    all_test_metrics,p = [],[]
+    all_test_metrics, all_train_metrics = [], []
     iteration = 0
 
     if rgs_names is None:
@@ -586,6 +587,9 @@ def split_test_regressors_with_optimization(df, targets, test_df, test_targets, 
         # Fit model using optimized parameters
         reg.set_params(**opt_param)
         reg.fit(Xtrain, ytrain)
+        #         Train set
+        train_predictions = reg.predict(Xtrain)
+
 
         #         Save Model
         targ = 'ddg'
@@ -601,8 +605,18 @@ def split_test_regressors_with_optimization(df, targets, test_df, test_targets, 
         test_predictions = reg.predict(Xtest)
         log.info("\n\t The predictions are: {}".format(test_predictions))
 
-
         #         Calculate metrics for regression
+        train_metrics = {}
+        train_metrics['name'] = name
+        train_metrics["variance"] = round(explained_variance_score(targets, train_predictions), 2)
+        train_metrics["MAE"] = round(mean_absolute_error(targets, train_predictions), 2)
+        train_metrics["MSE"] = round(mean_squared_error(targets, train_predictions), 2)
+        train_metrics["RMSE"] = math.sqrt(round(mean_squared_error(targets, train_predictions), 2))
+        train_metrics["R2"] = round(r2_score(targets, train_predictions), 2)
+
+        log.info(train_metrics)
+        all_train_metrics.append(train_metrics)
+        
         test_metrics = {}
         test_metrics['name'] = name
         test_metrics["variance"] = round(explained_variance_score(test_targets, test_predictions), 2)
@@ -613,74 +627,51 @@ def split_test_regressors_with_optimization(df, targets, test_df, test_targets, 
 
         log.info(test_metrics)
         all_test_metrics.append(test_metrics)
+        
+        # save the model to disk
+        model_savefile = 'model_{}.sav'.format(name)
+        pickle.dump(reg, open(model_savefile, 'wb'))
 
-        plt.figure(figsize=(6, 4))
-        plt.scatter(test_targets, test_predictions, color='blue', marker='x')
-        plt.ylabel('Predicted Δ∆$G^{‡}$ (kJ/mol)', fontsize=13)
-        plt.xlabel('Experimental Δ∆$G^{‡}$ (kJ/mol)', fontsize=13)
-        plt.plot([-0.05, 11], [-0.05, 11], "k:")
+        
+        plt.rcParams.update()
+        #ref: http://www.futurile.net/2016/02/27/matplotlib-beautiful-plots-with-style/
+        # Set the style globally
+        # Alternatives include bmh, fivethirtyeight, ggplot,
+        # dark_background, seaborn-deep, etc
+        plt.style.use('seaborn-white')
 
-        plt.xticks(np.arange(0, 12, step=2))
-        plt.yticks(np.arange(0, 12, step=2))
-        plt.savefig('{}/{}.png'.format(name, name))
+        plt.rcParams['font.family'] = 'serif'
+        plt.rcParams['font.serif'] = 'Ubuntu'
+        plt.rcParams['font.monospace'] = 'Ubuntu Mono'
+        plt.rcParams['font.size'] = 20
+        plt.rcParams['axes.labelsize'] = 20
+        plt.rcParams['axes.labelweight'] = 'bold'
+        plt.rcParams['axes.titlesize'] = 20
+        plt.rcParams['xtick.labelsize'] = 16
+        plt.rcParams['ytick.labelsize'] = 16
+        plt.rcParams['legend.fontsize'] = 20
+        plt.rcParams['figure.titlesize'] = 24
 
-        for i,j in zip(ytest,test_predictions):
-            p.append([i,j])
-        pred = pd.DataFrame(p, columns = ['actual','predicted'])
-        pred.to_csv("{}/predictions.csv".format(name), index=False)
-        del p[:]
+        plt.figure(figsize=(6, 6), dpi=300)
+        plt.scatter(targets, train_predictions, s=60, edgecolors="k", color='darkblue', label="Train")
+        plt.scatter(test_targets, test_predictions, s=60, edgecolors="k", color='lightgrey', label="Test")
+        plt.ylabel('Predicted')
+        plt.xlabel('Experimental')
+        plt.legend(loc='lower right')
+        plt.title(name.replace("_", " "))
+        plt.plot([-4.2, 2.2], [-4.2, 2.2], "k:")
+        plt.savefig('{}/{}.png'.format(name, name), dpi=300)
+        plt.show()
 
+    all_train_metrics = pd.DataFrame(all_train_metrics)
+    all_train_metrics.to_csv('train_metrics.csv')
+    
     all_test_metrics = pd.DataFrame(all_test_metrics)
     all_test_metrics.to_csv('test_metrics.csv')
 
-
-def ensemble(csv_files):
-    log = logging.getLogger(__name__)
-    predicted_values = []
-
-    ensemble_metrics = {}
-    # Read predicted values from each CSV file
-    for file in csv_files:
-        log.info("\n\t Reading:{} ".format(file))
-        data = pd.read_csv(file)
-        predicted_values.append(data['predicted'])
-
-    log.info("\n\t Gathered all predictions ")
-    # Calculate mean value of predicted values
-    mean_predicted = np.mean(predicted_values, axis=0)
-
-    # Get actual values from the first CSV file
-    actual = pd.read_csv(csv_files[0])['actual']
-    log.info("\n\tCalculating metrics")
-    # Calculate regression metrics
-    mae = mean_absolute_error(actual, mean_predicted)
-    mse = mean_squared_error(actual, mean_predicted)
-    rmse = np.sqrt(mse)
-    r2 = r2_score(actual, mean_predicted)
-
-    ensemble_metrics['mae'] = mae
-    ensemble_metrics['mse'] = mse
-    ensemble_metrics['rmse'] = rmse
-    ensemble_metrics['r2'] = r2
-
-    plt.figure(figsize=(6, 4))
-    plt.scatter(actual, mean_predicted, color='blue', marker='x')
-    plt.ylabel('Predicted Δ∆$G^{‡}$ (kJ/mol)', fontsize=13)
-    plt.xlabel('Experimental Δ∆$G^{‡}$ (kJ/mol)', fontsize=13)
-    plt.plot([-0.05, 11], [-0.05, 11], "k:")
-
-    plt.xticks(np.arange(0, 12, step=2))
-    plt.yticks(np.arange(0, 12, step=2))
-
-
-    return ensemble_metrics
-
-
-def kfold_test_classifiers_with_optimization(df, classes, classifiers, clf_options, scale=True, cv=5, n_repeats=20,
-                                             clf_names=None,
-                                             class_labels=(0, 1), no_train_output=False, test_set_size=0.2, smiles=None,
-                                             names=None,
-                                             random_seed=107901, overwrite=False):
+def kfold_test_classifiers_with_optimization(df, classes, classifiers, clf_options, scale=True, cv=5, n_repeats=20, clf_names=None,
+                                                        class_labels=(0,1), no_train_output=False, test_set_size=0.2, smiles=None, names=None,
+                                                        random_seed=107901, overwrite=False):
     """
     function to run classification test over classifiers using imbalenced resampling
     inspired from https://scikit-learn.org/stable/auto_examples/classification/plot_classifier_comparison.html
@@ -689,105 +680,103 @@ def kfold_test_classifiers_with_optimization(df, classes, classifiers, clf_optio
     :param classifiers: list - list of classifier methods
     :param plot: true/false - plot the results or not
     """
-
+    
     log = logging.getLogger(__name__)
-
+    
     log.info("Features: {}".format(df.columns))
-
+    
     log_df = pd.DataFrame()
     labelpredictions = pd.DataFrame()
-
-    list_report, list_roc_auc, list_opt_param, list_score, list_c_matrix = [], [], [], [], []
-    list_average_roc_auc, list_average_scores = [], []
-    disp, predictions, actual, index, same = [], [], [], [], []
-    probablity = []
-
+    
+    list_report, list_roc_auc, list_opt_param, list_score, list_c_matrix=[],[],[],[],[]
+    list_average_roc_auc,list_average_scores=[],[]
+    disp,predictions,actual,index,same = [], [], [],[],[]
+    probablity=[]
+    
     iteration = 0
     pd.set_option('display.max_columns', 20)
     data = df.copy()
     log.info("Features: {}".format(data))
     data.reset_index(inplace=True)
-
+        
     if clf_names is None:
         clf_names = [i for i in range(0, len(classifiers))]
-
+    
     if scale is True:
         data = scaling.minmaxscale(data)
         log.info("Scaled data:\n{}".format(data))
     else:
         log.info("Using unscaled features")
-
+    
     # Kfold n_repeats is the number of folds to run.
-    # Setting the random seed determines the degree of randomness. This means run n_repeats of
+    # Setting the random seed determines the degree of randomness. This means run n_repeats of 
     # independent cross validators.
     kf = KFold(n_splits=n_repeats, shuffle=True, random_state=random_seed)
-    log.info(
-        "Starting classification: NOTE on confusion matrix - In binary classification, true negatives is element 0,0, "
-        "false negatives is element 1,0, true positives is element 1,1 and false positives is element 0,1")
+    log.info("Starting classification: NOTE on confusion matrix - In binary classification, true negatives is element 0,0, "
+             "false negatives is element 1,0, true positives is element 1,1 and false positives is element 0,1")
     for name, classf in zip(clf_names, classifiers):
         log.info("\n-----\nBegin {}\n-----\n".format(name))
-
+        
         kf_iteration = 0
-        if not n_repeats % 2:
-            figure = plt.figure(figsize=(2 * 20.0, 5.0 * int(n_repeats / 2.0)))
-            plt_rows = int(n_repeats / 2.0)
-        else:
-            figure = plt.figure(figsize=(2 * 20.0, 5.0 * int(n_repeats / 2.0) + 1))
-            plt_rows = int(n_repeats / 2.0) + 1
+        #if not n_repeats % 2:
+            #figure = plt.figure(figsize=(2 * 20.0, 5.0 * int(n_repeats/2.0)))
+            #plt_rows = int(n_repeats/2.0)
+        #else:
+            #figure = plt.figure(figsize=(2 * 20.0, 5.0 * int(n_repeats/2.0)+1))
+            #plt_rows = int(n_repeats/2.0)+1
         scores = []
         confusion_matrices = []
         roc_aucs = []
         score_list = []
         tmp = []
         name = "{}".format("_".join(name.split()))
-
+        
         # Make directory for each classifier
         if not os.path.isdir(name):
-            os.makedirs(name, exist_ok=True)
+            os.makedirs(name, exist_ok = True)
         elif overwrite is False and os.path.isdir(name) is True:
             log.warning("Directory already exists and overwrite is False will stop before overwriting.".format(name))
             return None
         else:
             log.info("Directory {} already exists will be overwritten".format(name))
-
-        # Loop over  Kfold here
+        
+        # Loop over  Kfold here 
         for train_indx, test_indx in kf.split(df):
             log.info("----- {}: Fold {} -----".format(name, kf_iteration))
-
+            
             tmp = tmp + test_indx.tolist()
             log.info(test_indx.tolist())
-
+            
             # Set the training and testing sets by train test index
             log.info("\tTrain indx {}\n\tTest indx: {}".format(train_indx, test_indx))
-
+            
             # Train
             Xtrain = df.iloc[train_indx]
             log.debug("Train X\n{}".format(Xtrain))
             ytrain = classes.iloc[train_indx]
             log.debug("Train Y\n{}".format(ytrain))
-
+            
             # Test
             Xtest = df.iloc[test_indx]
             log.debug("Test X\n{}".format(Xtest))
             ytest = classes.iloc[test_indx]
             log.debug("Test Y\n{}".format(ytest))
-
+            
             # way to calculate the test indexes
-            # test_i = np.array(list(set(df.index) - set(train_indx)))
+            #test_i = np.array(list(set(df.index) - set(train_indx)))
 
             # Grid search model optimizer
-            opt_param = grid_search_classifier_parameters(classf, Xtrain, ytrain, clf_options, clf_names, iteration,
-                                                          no_train_output, cv=cv, name=name)
-
+            opt_param = grid_search_classifier_parameters(classf, Xtrain, ytrain, clf_options, clf_names, iteration, no_train_output, cv=cv, name=name)
+            
             list_opt_param.append(opt_param)
-
+            
             # Fit final model using optimized parameters
             clf = classf
             clf.set_params(**opt_param)
             log.info("\n\t----- Predicting using: {} -----".format(name))
             log.debug("\tXtrain: {}\n\tXtest: {}\n\tytrain: {}\n\tytest: {}".format(Xtrain, Xtest, ytrain, ytest))
             clf.fit(Xtrain, ytrain.values.ravel())
-
+            
             # Evaluate the model
             ## evaluate the model on multiple metric score as list for averaging
             predicted_clf = clf.predict(Xtest)
@@ -795,123 +784,112 @@ def kfold_test_classifiers_with_optimization(df, classes, classifiers, clf_optio
             sc_df = pd.DataFrame(data=np.array(sc).T, columns=["precision", "recall", "f1score", "support"])
             sc_df.to_csv(os.path.join(name, "fold_{}_score.csv".format(kf_iteration)))
             score_list.append(sc)
-
+            
             ## evaluate the principle score metric only (incase different to those above although this is unlikely)
             clf_score = clf.score(Xtest, ytest)
             scores.append(clf_score)
-
-            ## Get the confusion matrices
+            
+            ## Get the confusion matrices 
             c_matrix = confusion_matrix(ytest, predicted_clf, labels=class_labels)
             confusion_matrices.append(c_matrix)
-
+            
             ## Calculate the roc area under the curve
             probs = clf.predict_proba(Xtest)
-            fpr, tpr, thresholds = roc_curve(ytest, probs[:, 1], pos_label=1)
+            fpr, tpr, thresholds = roc_curve(ytest, probs[:,1], pos_label=1)
             roc_auc = auc(fpr, tpr)
-
+            
             list_roc_auc.append(roc_auc)
-
+            
             roc_aucs.append(roc_auc)
             log.info("\tROC analysis area under the curve: {}".format(roc_auc))
-
+            
             # output metrics for consideration
             log.info("\tConfusion matrix ({}):\n{}\n".format(name, c_matrix))
-
+            
             list_c_matrix.append(c_matrix)
-            log.info("\n\tscore ({}): {}".format(name, clf_score))
+            log.info("\n\tscore ({}): {}".format(name, clf_score))   
 
             list_score.append(clf_score)
-
+        
             log.info("\tImbalence reports:")
-            log.info(
-                "\tImbalence classification report:\n{}".format(classification_report_imbalanced(ytest, predicted_clf)))
+            log.info("\tImbalence classification report:\n{}".format(classification_report_imbalanced(ytest, predicted_clf)))
             output_dict = classification_report_imbalanced(ytest, predicted_clf, output_dict=True)
-
+            
             ## Plot the roc curves
-            ax = plt.subplot(2, plt_rows, kf_iteration + 1)
-            ax.plot(fpr, tpr, color="red",
-                    lw=1.5, label="ROC curve (auc = {:.2f})".format(roc_auc))
+            #ax = plt.subplot(2, plt_rows, kf_iteration+1)
+            #ax.plot(fpr, tpr, color="red",
+            #         lw=1.5, label="ROC curve (auc = {:.2f})".format(roc_auc))
+            
+                # ugliest legend i ve made in my life - maybe one under the other?
+            
+            #ax.plot(fpr, tpr, alpha=0.0,color="white", lw=1.5,label= "pre_class0 = {:.2f}\n".format(output_dict[0]['pre'])+"pre_class1 = {:.2f}".format(output_dict[1]['pre']))
+            #ax.plot(fpr, tpr, alpha=0.0,color="white", lw=1.5,label= "f1_class0 = {:.2f}\n".format(output_dict[0]['f1'])+ "f1_class1 = {:.2f}".format(output_dict[1]['f1']))
+            #ax.plot(fpr, tpr, alpha=0.0,color="white", lw=1.5,label= "rec_class0 = {:.2f}\n".format(output_dict[0]['rec'])+ "rec_class1 = {:.2f}".format(output_dict[1]['rec']))
 
-            # ugliest legend i ve made in my life - maybe one under the other?
-
-            ax.plot(fpr, tpr, alpha=0.0, color="white", lw=1.5,
-                    label="pre_class0 = {:.2f}\n".format(output_dict[0]['pre']) + "pre_class1 = {:.2f}".format(
-                        output_dict[1]['pre']))
-            ax.plot(fpr, tpr, alpha=0.0, color="white", lw=1.5,
-                    label="f1_class0 = {:.2f}\n".format(output_dict[0]['f1']) + "f1_class1 = {:.2f}".format(
-                        output_dict[1]['f1']))
-            ax.plot(fpr, tpr, alpha=0.0, color="white", lw=1.5,
-                    label="rec_class0 = {:.2f}\n".format(output_dict[0]['rec']) + "rec_class1 = {:.2f}".format(
-                        output_dict[1]['rec']))
-
-            ax.plot([0, 1], [0, 1], "k:")
-            ax.set_xlim(xmin=0.0, xmax=1.01)
-            ax.set_ylim(ymin=0.0, ymax=1.01)
-            ax.set_xlabel('False Positive Rate')
-            ax.set_ylabel('True Positive Rate')
-            ax.legend(loc="lower right")
-
+            #ax.plot([0, 1], [0, 1], "k:")
+            #ax.set_xlim(xmin=0.0, xmax=1.01)
+            #ax.set_ylim(ymin=0.0, ymax=1.01)
+            #ax.set_xlabel('False Positive Rate')
+            #ax.legend(loc="lower right")
+            #ax.set_ylabel('True Positive Rate')
+            
+                   
             list_report.append(classification_report_imbalanced(ytest, predicted_clf))
-
+            
             sensitvity, specificity, support = sensitivity_specificity_support(ytest, predicted_clf)
             log.debug("\t{} {} {}".format(sensitvity, specificity, support))
             log.info("\t Index | Predicted | Label\n\t------------------")
-            log.info("\t{}\n-----\n".format("\n\t".join(["{}   |   {}   |   {}".format(i, p, k) for i, p, k in
-                                                         zip(test_indx, predicted_clf, ytest["classes"].values)])))
-
-            pred = [list(test_indx), list(ytest["classes"].values), list(predicted_clf), list(probs[:, 0]),
-                    list(probs[:, 1])]
-
+            log.info("\t{}\n-----\n".format("\n\t".join(["{}   |   {}   |   {}".format(i, p, k) for i, p, k in zip(test_indx, predicted_clf, ytest["classes"].values)])))
+    
+            pred = [list(test_indx),list(ytest["classes"].values),list(predicted_clf), list(probs[:,0]), list(probs[:,1])]
+            
             pred = pd.DataFrame(pred)
             pred.T.to_csv("{}/{}.csv".format(name, kf_iteration))
             kf_iteration = kf_iteration + 1
-
+        
         del predictions[:]
-
+        
         if any(x not in tmp for x in [y for y in range(len(classes.index))]):
-            log.info("WARNING there appears to be left over indexes which have not been used for testing: {}".format())
+             log.info("WARNING there appears to be left over indexes which have not been used for testing: {}".format())
         else:
             log.info("All points have been used in a test case over all fold as they should have been")
-
+        
         # Plot and assess classifier over all folds
-
+        
         # NOTE - rows are scores columns are classes
         average_scores = np.mean(score_list, axis=0)
         std_scores = np.std(score_list, axis=0)
         average_roc_auc = np.mean(roc_aucs, axis=0)
         std_roc_auc = np.std(roc_aucs, axis=0)
-
+        
         log.info("{} {} {} {}".format(average_scores, std_scores, average_roc_auc, std_roc_auc))
 
         # precision_recall_fscore_support
-        score_str1 = "Class 0: Pre: {:.2f} +/- {:.2f} Rec: {:.2f} +/- {:.2f} Fsc: {:.2f} +/- {:.2f} Sup: {:.2f} +/- {:.2f}".format(
-            average_scores[0][0],
-            std_scores[0][0],
-            average_scores[1][0],
-            std_scores[1][0],
-            average_scores[2][0],
-            std_scores[2][0],
-            average_scores[3][0],
-            std_scores[3][0])
-        score_str2 = "Class 1: Pre: {:.2f} +/- {:.2f} Rec: {:.2f} +/- {:.2f} Fsc: {:.2f} +/- {:.2f} Sup: {:.2f} +/- {:.2f}".format(
-            average_scores[0][1],
-            std_scores[0][1],
-            average_scores[1][1],
-            std_scores[1][1],
-            average_scores[2][1],
-            std_scores[2][1],
-            average_scores[3][1],
-            std_scores[3][1])
-        score_str3 = "Average ROC AUCs: {:.2f} +/- {:.2f}".format(average_roc_auc, std_roc_auc)
+        score_str1 = "Class 0: Pre: {:.2f} +/- {:.2f} Rec: {:.2f} +/- {:.2f} Fsc: {:.2f} +/- {:.2f} Sup: {:.2f} +/- {:.2f}".format(average_scores[0][0], 
+                                                                                                                                   std_scores[0][0], 
+                                                                                                                                   average_scores[1][0], 
+                                                                                                                                   std_scores[1][0], 
+                                                                                                                                   average_scores[2][0], 
+                                                                                                                                   std_scores[2][0], 
+                                                                                                                                   average_scores[3][0], 
+                                                                                                                                   std_scores[3][0])
+        score_str2 = "Class 1: Pre: {:.2f} +/- {:.2f} Rec: {:.2f} +/- {:.2f} Fsc: {:.2f} +/- {:.2f} Sup: {:.2f} +/- {:.2f}".format(average_scores[0][1], 
+                                                                                                                                   std_scores[0][1], 
+                                                                                                                                   average_scores[1][1], 
+                                                                                                                                   std_scores[1][1], 
+                                                                                                                                   average_scores[2][1], 
+                                                                                                                                   std_scores[2][1], 
+                                                                                                                                   average_scores[3][1], 
+                                                                                                                                   std_scores[3][1])
+        score_str3 ="Average ROC AUCs: {:.2f} +/- {:.2f}".format(average_roc_auc, std_roc_auc)
         score_text = "{}\n{}\n{}".format(score_str1, score_str2, score_str3)
-        plt.annotate(score_text, xy=(0.5, 0), xytext=(0, 0), xycoords="figure fraction", textcoords='offset points',
-                     size=12, ha='center', va='bottom')
-        figure.tight_layout()
-        plt.savefig("{0}/{0}_roc_curves.png".format(name))
-        plt.show()
+        #plt.annotate(score_text, xy=(0.5, 0), xytext=(0, 0), xycoords="figure fraction", textcoords='offset points', size=12, ha='center', va='bottom')
+        #figure.tight_layout()
+        #plt.savefig("{0}/{0}_roc_curves.png".format(name))
+        #plt.show()
 
         iteration = iteration + 1
-
+    
     log_df["opt_param"] = pd.Series(list_opt_param)
     log_df["roc_auc"] = pd.Series(list_roc_auc)
 
@@ -919,14 +897,13 @@ def kfold_test_classifiers_with_optimization(df, classes, classifiers, clf_optio
     log_df["score"] = pd.Series(list_score)
 
     log_df["c_matrix"] = pd.Series(list_c_matrix)
+    
+    # log_df.to_csv("logs2.csv")
 
 
-def kfold_test_classifiers_with_optimization_and_shap(X, y, classifiers, clf_options, scale=True, cv=5, n_repeats=20,
-                                                      clf_names=None,
-                                                      class_labels=(0, 1), no_train_output=False, test_set_size=0.2,
-                                                      smiles=None,
-                                                      names=None,
-                                                      random_seed=107901, overwrite=False):
+def kfold_test_classifiers_with_optimization_weights(df, classes, classifiers, clf_options, scale=True, cv=5, n_repeats=20, clf_names=None,class_weight=None,
+                                                        class_labels=(0,1), no_train_output=False, test_set_size=0.2, smiles=None, names=None,
+                                                        random_seed=107901, overwrite=False):
     """
     function to run classification test over classifiers using imbalenced resampling
     inspired from https://scikit-learn.org/stable/auto_examples/classification/plot_classifier_comparison.html
@@ -935,243 +912,217 @@ def kfold_test_classifiers_with_optimization_and_shap(X, y, classifiers, clf_opt
     :param classifiers: list - list of classifier methods
     :param plot: true/false - plot the results or not
     """
-
+    
     log = logging.getLogger(__name__)
-
-    log.info("Features: {}".format(X.columns))
-    columns = X.columns
+    
+    log.info("Features: {}".format(df.columns))
+    
     log_df = pd.DataFrame()
     labelpredictions = pd.DataFrame()
-
-    list_report, list_roc_auc, list_opt_param, list_score, list_c_matrix = [], [], [], [], []
-    list_average_roc_auc, list_average_scores = [], []
-    disp, predictions, actual, index, same = [], [], [], [], []
-    probablity = []
-
+    
+    list_report, list_roc_auc, list_opt_param, list_score, list_c_matrix=[],[],[],[],[]
+    list_average_roc_auc,list_average_scores=[],[]
+    disp,predictions,actual,index,same = [], [], [],[],[]
+    probablity=[]
+    
     iteration = 0
     pd.set_option('display.max_columns', 20)
-    data = X.copy()
+    data = df.copy()
     log.info("Features: {}".format(data))
     data.reset_index(inplace=True)
-
+        
     if clf_names is None:
         clf_names = [i for i in range(0, len(classifiers))]
-
+    
     if scale is True:
         data = scaling.minmaxscale(data)
         log.info("Scaled data:\n{}".format(data))
     else:
         log.info("Using unscaled features")
-
+    
     # Kfold n_repeats is the number of folds to run.
-    # Setting the random seed determines the degree of randomness. This means run n_repeats of
+    # Setting the random seed determines the degree of randomness. This means run n_repeats of 
     # independent cross validators.
     kf = KFold(n_splits=n_repeats, shuffle=True, random_state=random_seed)
-    log.info(
-        "Starting classification: NOTE on confusion matrix - In binary classification, true negatives is element 0,0, "
-        "false negatives is element 1,0, true positives is element 1,1 and false positives is element 0,1")
+    log.info("Starting classification: NOTE on confusion matrix - In binary classification, true negatives is element 0,0, "
+             "false negatives is element 1,0, true positives is element 1,1 and false positives is element 0,1")
     for name, classf in zip(clf_names, classifiers):
         log.info("\n-----\nBegin {}\n-----\n".format(name))
-
+        
         kf_iteration = 0
         if not n_repeats % 2:
-            figure = plt.figure(figsize=(2 * 20.0, 5.0 * int(n_repeats / 2.0)))
-            plt_rows = int(n_repeats / 2.0)
+            figure = plt.figure(figsize=(2 * 20.0, 5.0 * int(n_repeats/2.0)))
+            plt_rows = int(n_repeats/2.0)
         else:
-            figure = plt.figure(figsize=(2 * 20.0, 5.0 * int(n_repeats / 2.0) + 1))
-            plt_rows = int(n_repeats / 2.0) + 1
+            figure = plt.figure(figsize=(2 * 20.0, 5.0 * int(n_repeats/2.0)+1))
+            plt_rows = int(n_repeats/2.0)+1
         scores = []
         confusion_matrices = []
         roc_aucs = []
         score_list = []
         tmp = []
         name = "{}".format("_".join(name.split()))
-
+        
         # Make directory for each classifier
         if not os.path.isdir(name):
-            os.makedirs(name, exist_ok=True)
+            os.makedirs(name, exist_ok = True)
         elif overwrite is False and os.path.isdir(name) is True:
             log.warning("Directory already exists and overwrite is False will stop before overwriting.".format(name))
             return None
         else:
             log.info("Directory {} already exists will be overwritten".format(name))
-
-        # Loop over  Kfold here
-        list_shap_values = list()
-        list_test_sets = list()
-
-        for train_indx, test_indx in kf.split(X):
+        
+        # Loop over  Kfold here 
+        for train_indx, test_indx in kf.split(df):
             log.info("----- {}: Fold {} -----".format(name, kf_iteration))
-
+            
             tmp = tmp + test_indx.tolist()
             log.info(test_indx.tolist())
-
+            
             # Set the training and testing sets by train test index
             log.info("\tTrain indx {}\n\tTest indx: {}".format(train_indx, test_indx))
-
-            X_train, X_test = X.iloc[train_indx], X.iloc[test_indx]
-            y_train, y_test = y.iloc[train_indx], y.iloc[test_indx]
-            X_train = pd.DataFrame(X_train, columns=columns)
-            X_test = pd.DataFrame(X_test, columns=columns)
+            
+            # Train
+            Xtrain = df.iloc[train_indx]
+            log.debug("Train X\n{}".format(Xtrain))
+            ytrain = classes.iloc[train_indx]
+            log.debug("Train Y\n{}".format(ytrain))
+            
+            # Test
+            Xtest = df.iloc[test_indx]
+            log.debug("Test X\n{}".format(Xtest))
+            ytest = classes.iloc[test_indx]
+            log.debug("Test Y\n{}".format(ytest))
+            
+            # way to calculate the test indexes
+            #test_i = np.array(list(set(df.index) - set(train_indx)))
 
             # Grid search model optimizer
-            opt_param = grid_search_classifier_parameters(classf, X_train, y_train, clf_options, clf_names,
-                                                              iteration,
-                                                              no_train_output, cv=cv, name=name)
-
+            opt_param = grid_search_classifier_parameters(classf, Xtrain, ytrain, clf_options, clf_names, iteration, no_train_output, cv=cv, name=name)
+            
             list_opt_param.append(opt_param)
-
+            
             # Fit final model using optimized parameters
             clf = classf
             clf.set_params(**opt_param)
+            clf.set_params(class_weight=class_weight)
             log.info("\n\t----- Predicting using: {} -----".format(name))
-            clf.fit(X_train, y_train)
-
-            #             if clf is tree
-
-            # explaining model
-            explainer = shap.KernelExplainer(clf.predict_proba, X_train)
-            shap_values = explainer.shap_values(X_test)
-            # for each iteration we save the test_set index and the shap_values
-            list_shap_values.append(shap_values)
-            list_test_sets.append(test_indx)
-
+            log.debug("\tXtrain: {}\n\tXtest: {}\n\tytrain: {}\n\tytest: {}".format(Xtrain, Xtest, ytrain, ytest))
+            clf.fit(Xtrain, ytrain.values.ravel())
+            
             # Evaluate the model
             ## evaluate the model on multiple metric score as list for averaging
-            predicted_clf = clf.predict(X_test)
-            sc = precision_recall_fscore_support(y_test, predicted_clf, average=None)
+            predicted_clf = clf.predict(Xtest)
+            sc = precision_recall_fscore_support(ytest, predicted_clf, average=None)
             sc_df = pd.DataFrame(data=np.array(sc).T, columns=["precision", "recall", "f1score", "support"])
             sc_df.to_csv(os.path.join(name, "fold_{}_score.csv".format(kf_iteration)))
             score_list.append(sc)
-
+            
             ## evaluate the principle score metric only (incase different to those above although this is unlikely)
-            clf_score = clf.score(X_test, y_test)
+            clf_score = clf.score(Xtest, ytest)
             scores.append(clf_score)
-
-            ## Get the confusion matrices
-            c_matrix = confusion_matrix(y_test, predicted_clf, labels=class_labels)
+            
+            ## Get the confusion matrices 
+            c_matrix = confusion_matrix(ytest, predicted_clf, labels=class_labels)
             confusion_matrices.append(c_matrix)
-
+            
             ## Calculate the roc area under the curve
-            probs = clf.predict_proba(X_test)
-            fpr, tpr, thresholds = roc_curve(y_test, probs[:, 1], pos_label=1)
+            probs = clf.predict_proba(Xtest)
+            fpr, tpr, thresholds = roc_curve(ytest, probs[:,1], pos_label=1)
             roc_auc = auc(fpr, tpr)
-
+            
             list_roc_auc.append(roc_auc)
-
+            
             roc_aucs.append(roc_auc)
             log.info("\tROC analysis area under the curve: {}".format(roc_auc))
-
+            
             # output metrics for consideration
             log.info("\tConfusion matrix ({}):\n{}\n".format(name, c_matrix))
-
+            
             list_c_matrix.append(c_matrix)
-            log.info("\n\tscore ({}): {}".format(name, clf_score))
+            log.info("\n\tscore ({}): {}".format(name, clf_score))   
 
             list_score.append(clf_score)
-
+        
             log.info("\tImbalence reports:")
-            log.info(
-                "\tImbalence classification report:\n{}".format(
-                    classification_report_imbalanced(y_test, predicted_clf)))
-            output_dict = classification_report_imbalanced(y_test, predicted_clf, output_dict=True)
-
+            log.info("\tImbalence classification report:\n{}".format(classification_report_imbalanced(ytest, predicted_clf)))
+            output_dict = classification_report_imbalanced(ytest, predicted_clf, output_dict=True)
+            
             ## Plot the roc curves
-            ax = plt.subplot(2, plt_rows, kf_iteration + 1)
-            ax.plot(fpr, tpr, color="red",
-                    lw=1.5, label="ROC curve (auc = {:.2f})".format(roc_auc))
-
-            # ugliest legend i ve made in my life - maybe one under the other?
-
-            ax.plot(fpr, tpr, alpha=0.0, color="white", lw=1.5,
-                    label="pre_class0 = {:.2f}\n".format(output_dict[0]['pre']) + "pre_class1 = {:.2f}".format(
-                        output_dict[1]['pre']))
-            ax.plot(fpr, tpr, alpha=0.0, color="white", lw=1.5,
-                    label="f1_class0 = {:.2f}\n".format(output_dict[0]['f1']) + "f1_class1 = {:.2f}".format(
-                        output_dict[1]['f1']))
-            ax.plot(fpr, tpr, alpha=0.0, color="white", lw=1.5,
-                    label="rec_class0 = {:.2f}\n".format(output_dict[0]['rec']) + "rec_class1 = {:.2f}".format(
-                        output_dict[1]['rec']))
-
-            ax.plot([0, 1], [0, 1], "k:")
-            ax.set_xlim(xmin=0.0, xmax=1.01)
-            ax.set_ylim(ymin=0.0, ymax=1.01)
-            ax.set_xlabel('False Positive Rate')
-            ax.set_ylabel('True Positive Rate')
-            ax.legend(loc="lower right")
-
-            list_report.append(classification_report_imbalanced(y_test, predicted_clf))
-
-            sensitvity, specificity, support = sensitivity_specificity_support(y_test, predicted_clf)
+            #ax = plt.subplot(2, plt_rows, kf_iteration+1)
+            #ax.plot(fpr, tpr, color="red",
+            #         lw=1.5, label="ROC curve (auc = {:.2f})".format(roc_auc))
+            #
+            #    # ugliest legend i ve made in my life - maybe one under the other?
+            #
+            #ax.plot(fpr, tpr, alpha=0.0,color="white", lw=1.5,label= "pre_class0 = {:.2f}\n".format(output_dict[0]['pre'])+"pre_class1 = {:.2f}".format(output_dict[1]['pre']))
+            #ax.plot(fpr, tpr, alpha=0.0,color="white", lw=1.5,label= "f1_class0 = {:.2f}\n".format(output_dict[0]['f1'])+ "f1_class1 = {:.2f}".format(output_dict[1]['f1']))
+            #ax.plot(fpr, tpr, alpha=0.0,color="white", lw=1.5,label= "rec_class0 = {:.2f}\n".format(output_dict[0]['rec'])+ "rec_class1 = {:.2f}".format(output_dict[1]['rec']))
+#
+            #ax.plot([0, 1], [0, 1], "k:")
+            #ax.set_xlim(xmin=0.0, xmax=1.01)
+            #ax.set_ylim(ymin=0.0, ymax=1.01)
+            #ax.set_xlabel('False Positive Rate')
+            #ax.set_ylabel('True Positive Rate')
+            #ax.legend(loc="lower right")
+            
+                   
+            list_report.append(classification_report_imbalanced(ytest, predicted_clf))
+            
+            sensitvity, specificity, support = sensitivity_specificity_support(ytest, predicted_clf)
             log.debug("\t{} {} {}".format(sensitvity, specificity, support))
             log.info("\t Index | Predicted | Label\n\t------------------")
-            log.info("\t{}\n-----\n".format("\n\t".join(["{}   |   {}   |   {}".format(i, p, k) for i, p, k in
-                                                         zip(test_indx, predicted_clf, y_test["classes"].values)])))
-
-            pred = [list(test_indx), list(y_test["classes"].values), list(predicted_clf), list(probs[:, 0]),
-                    list(probs[:, 1])]
-
+            log.info("\t{}\n-----\n".format("\n\t".join(["{}   |   {}   |   {}".format(i, p, k) for i, p, k in zip(test_indx, predicted_clf, ytest["classes"].values)])))
+    
+            pred = [list(test_indx),list(ytest["classes"].values),list(predicted_clf), list(probs[:,0]), list(probs[:,1])]
+            
             pred = pd.DataFrame(pred)
             pred.T.to_csv("{}/{}.csv".format(name, kf_iteration))
             kf_iteration = kf_iteration + 1
-
-        # combining results from all iterations
-        test_set = list_test_sets[0]
-        shap_values = np.array(list_shap_values[0])
-        for i in range(1, len(list_test_sets)):
-                test_set = np.concatenate((test_set, list_test_sets[i]), axis=0)
-                shap_values = np.concatenate((shap_values, np.array(list_shap_values[i])), axis=1)
-            # bringing back variable names
-        X_test = pd.DataFrame(X.iloc[test_set], columns=columns)
-        shap.summary_plot(shap_values[1], X_test)
-        # plt.savefig("{0}/{0}_shap.png".format(name))
-
+        
         del predictions[:]
-
-        if any(x not in tmp for x in [y for y in range(len(y.index))]):
-            log.info("WARNING there appears to be left over indexes which have not been used for testing: {}".format())
+        
+        if any(x not in tmp for x in [y for y in range(len(classes.index))]):
+             log.info("WARNING there appears to be left over indexes which have not been used for testing: {}".format())
         else:
             log.info("All points have been used in a test case over all fold as they should have been")
-
+        
         # Plot and assess classifier over all folds
-
+        
         # NOTE - rows are scores columns are classes
         average_scores = np.mean(score_list, axis=0)
         std_scores = np.std(score_list, axis=0)
         average_roc_auc = np.mean(roc_aucs, axis=0)
         std_roc_auc = np.std(roc_aucs, axis=0)
-
+        
         log.info("{} {} {} {}".format(average_scores, std_scores, average_roc_auc, std_roc_auc))
 
         # precision_recall_fscore_support
-        score_str1 = "Class 0: Pre: {:.2f} +/- {:.2f} Rec: {:.2f} +/- {:.2f} Fsc: {:.2f} +/- {:.2f} Sup: {:.2f} +/- {:.2f}".format(
-            average_scores[0][0],
-            std_scores[0][0],
-            average_scores[1][0],
-            std_scores[1][0],
-            average_scores[2][0],
-            std_scores[2][0],
-            average_scores[3][0],
-            std_scores[3][0])
-        score_str2 = "Class 1: Pre: {:.2f} +/- {:.2f} Rec: {:.2f} +/- {:.2f} Fsc: {:.2f} +/- {:.2f} Sup: {:.2f} +/- {:.2f}".format(
-            average_scores[0][1],
-            std_scores[0][1],
-            average_scores[1][1],
-            std_scores[1][1],
-            average_scores[2][1],
-            std_scores[2][1],
-            average_scores[3][1],
-            std_scores[3][1])
-        score_str3 = "Average ROC AUCs: {:.2f} +/- {:.2f}".format(average_roc_auc, std_roc_auc)
+        score_str1 = "Class 0: Pre: {:.2f} +/- {:.2f} Rec: {:.2f} +/- {:.2f} Fsc: {:.2f} +/- {:.2f} Sup: {:.2f} +/- {:.2f}".format(average_scores[0][0], 
+                                                                                                                                   std_scores[0][0], 
+                                                                                                                                   average_scores[1][0], 
+                                                                                                                                   std_scores[1][0], 
+                                                                                                                                   average_scores[2][0], 
+                                                                                                                                   std_scores[2][0], 
+                                                                                                                                   average_scores[3][0], 
+                                                                                                                                   std_scores[3][0])
+        score_str2 = "Class 1: Pre: {:.2f} +/- {:.2f} Rec: {:.2f} +/- {:.2f} Fsc: {:.2f} +/- {:.2f} Sup: {:.2f} +/- {:.2f}".format(average_scores[0][1], 
+                                                                                                                                   std_scores[0][1], 
+                                                                                                                                   average_scores[1][1], 
+                                                                                                                                   std_scores[1][1], 
+                                                                                                                                   average_scores[2][1], 
+                                                                                                                                   std_scores[2][1], 
+                                                                                                                                   average_scores[3][1], 
+                                                                                                                                   std_scores[3][1])
+        score_str3 ="Average ROC AUCs: {:.2f} +/- {:.2f}".format(average_roc_auc, std_roc_auc)
         score_text = "{}\n{}\n{}".format(score_str1, score_str2, score_str3)
-        plt.annotate(score_text, xy=(0.5, 0), xytext=(0, 0), xycoords="figure fraction", textcoords='offset points',
-                     size=12, ha='center', va='bottom')
+        plt.annotate(score_text, xy=(0.5, 0), xytext=(0, 0), xycoords="figure fraction", textcoords='offset points', size=12, ha='center', va='bottom')
         figure.tight_layout()
         plt.savefig("{0}/{0}_roc_curves.png".format(name))
         plt.show()
 
         iteration = iteration + 1
-
+    
     log_df["opt_param"] = pd.Series(list_opt_param)
     log_df["roc_auc"] = pd.Series(list_roc_auc)
 
@@ -1179,6 +1130,8 @@ def kfold_test_classifiers_with_optimization_and_shap(X, y, classifiers, clf_opt
     log_df["score"] = pd.Series(list_score)
 
     log_df["c_matrix"] = pd.Series(list_c_matrix)
+    
+    # log_df.to_csv("logs2.csv")
 
 
 
@@ -1222,12 +1175,12 @@ def test_classifiers_with_optimization(df, test_df, classes, testclasses, classi
         log.info("\n-----\nBegin {}\n-----\n".format(name))
 
         kf_iteration = 0
-        if not n_repeats % 2:
-            figure = plt.figure(figsize=(2 * 20.0, 5.0 * int(n_repeats / 2.0)))
-            plt_rows = int(n_repeats / 2.0)
-        else:
-            figure = plt.figure(figsize=(2 * 20.0, 5.0 * int(n_repeats / 2.0) + 1))
-            plt_rows = nt(n_repeats / 2.0) + 1
+        #if not n_repeats % 2:
+        #    figure = plt.figure(figsize=(2 * 20.0, 5.0 * int(n_repeats / 2.0)))
+        #    plt_rows = int(n_repeats / 2.0)
+        #else:
+        #    figure = plt.figure(figsize=(2 * 20.0, 5.0 * int(n_repeats / 2.0) + 1))
+        #    plt_rows = nt(n_repeats / 2.0) + 1
         scores = []
         confusion_matrices = []
         roc_aucs = []
@@ -1270,6 +1223,10 @@ def test_classifiers_with_optimization(df, test_df, classes, testclasses, classi
         log.info("\n\t----- Predicting using: {} -----".format(name))
         log.debug("\tXtrain: {}\n\tXtest: {}\n\tytrain: {}\n\tytest: {}".format(Xtrain, Xtest, ytrain, ytest))
         clf.fit(Xtrain, ytrain)
+        
+        # save the model to disk
+        model_savefile = 'model_{}.sav'.format(name)
+        pickle.dump(clf, open(model_savefile, 'wb'))
 
         # Evaluate the model
         ## evaluate the model on multiple metric score as list for averaging
@@ -1311,26 +1268,26 @@ def test_classifiers_with_optimization(df, test_df, classes, testclasses, classi
         output_dict = classification_report_imbalanced(ytest, predicted_clf, output_dict=True)
 
         ## Plot the roc curves
-        ax = plt.subplot(2, plt_rows, kf_iteration + 1)
-        ax.plot(fpr, tpr, color="red",
-                lw=1.5, label="ROC curve (auc = {:.2f})".format(roc_auc))
+        #ax = plt.subplot(2, plt_rows, kf_iteration + 1)
+        #ax.plot(fpr, tpr, color="red",
+        #        lw=1.5, label="ROC curve (auc = {:.2f})".format(roc_auc))
 
-        ax.plot(fpr, tpr, alpha=0.0, color="white", lw=1.5,
-                label="pre_class0 = {:.2f}\n".format(output_dict[0]['pre']) + "pre_class1 = {:.2f}".format(
-                    output_dict[1]['pre']))
-        ax.plot(fpr, tpr, alpha=0.0, color="white", lw=1.5,
-                label="f1_class0 = {:.2f}\n".format(output_dict[0]['f1']) + "f1_class1 = {:.2f}".format(
-                    output_dict[1]['f1']))
-        ax.plot(fpr, tpr, alpha=0.0, color="white", lw=1.5,
-                label="rec_class0 = {:.2f}\n".format(output_dict[0]['rec']) + "rec_class1 = {:.2f}".format(
-                    output_dict[1]['rec']))
+        #ax.plot(fpr, tpr, alpha=0.0, color="white", lw=1.5,
+        #        label="pre_class0 = {:.2f}\n".format(output_dict[0]['pre']) + "pre_class1 = {:.2f}".format(
+        #            output_dict[1]['pre']))
+        #ax.plot(fpr, tpr, alpha=0.0, color="white", lw=1.5,
+        #        label="f1_class0 = {:.2f}\n".format(output_dict[0]['f1']) + "f1_class1 = {:.2f}".format(
+        #            output_dict[1]['f1']))
+        #ax.plot(fpr, tpr, alpha=0.0, color="white", lw=1.5,
+        #        label="rec_class0 = {:.2f}\n".format(output_dict[0]['rec']) + "rec_class1 = {:.2f}".format(
+        #            output_dict[1]['rec']))
 
-        ax.plot([0, 1], [0, 1], "k:")
-        ax.set_xlim(xmin=0.0, xmax=1.01)
-        ax.set_ylim(ymin=0.0, ymax=1.01)
-        ax.set_xlabel('False Positive Rate')
-        ax.set_ylabel('True Positive Rate')
-        ax.legend(loc="lower right")
+        #ax.plot([0, 1], [0, 1], "k:")
+        #ax.set_xlim(xmin=0.0, xmax=1.01)
+        #ax.set_ylim(ymin=0.0, ymax=1.01)
+        #ax.set_xlabel('False Positive Rate')
+        #ax.set_ylabel('True Positive Rate')
+        #ax.legend(loc="lower right")
 
         list_report.append(classification_report_imbalanced(ytest, predicted_clf))
 
@@ -1380,9 +1337,9 @@ def test_classifiers_with_optimization(df, test_df, classes, testclasses, classi
         score_text = "{}\n{}\n{}".format(score_str1, score_str2, score_str3)
         plt.annotate(score_text, xy=(0.5, 0), xytext=(0, 0), xycoords="figure fraction", textcoords='offset points',
                      size=12, ha='center', va='bottom')
-        figure.tight_layout()
-        plt.savefig("{0}/{0}_roc_curves.png".format(name))
-        plt.show()
+        #figure.tight_layout()
+        #plt.savefig("{0}/{0}_roc_curves.png".format(name))
+        #plt.show()
 
         iteration = iteration + 1
     log_df["opt_param"] = pd.Series(list_opt_param)
@@ -1405,7 +1362,7 @@ def directory_names(classifier_names):
     
 def build_data_from_directory(data_directory, max_folds=10):
     """
-    Fucntion to build a set of data from csv files names K.csv where K is the fold number and the csv
+    Function to build a set of data from csv files names K.csv where K is the fold number and the csv
     is the predictions for the test data from that fold
     :param directory: str - name of the directory to read the csv files from
     :param max_fold: int - the number of folds run in the Kfold cv
@@ -1433,7 +1390,7 @@ def build_data_from_directory(data_directory, max_folds=10):
 
 def build_data_from_directory_regr(data_directory, max_folds=10):
     """
-    Fucntion to build a set of data from csv files names K.csv where K is the fold number and the csv
+    Function to build a set of data from csv files names K.csv where K is the fold number and the csv
     is the predictions for the test data from that fold
     :param directory: str - name of the directory to read the csv files from
     :param max_fold: int - the number of folds run in the Kfold cv
@@ -1457,6 +1414,7 @@ def build_data_from_directory_regr(data_directory, max_folds=10):
     data.sort_index(inplace=True)
 
     return data
+
 
 def metrics_for_regression(directories=('LassoCV', 'KNeighborsRegressor', 'DecisionTreeRegressor', 'SVR', 'BayesianRegr'),
     max_folds=10,names=None, smiles=None):
@@ -1490,15 +1448,48 @@ def metrics_for_regression(directories=('LassoCV', 'KNeighborsRegressor', 'Decis
         f.write(str(R2))
         f.write("\n")
         f.close()
-        plt.scatter(data['known'], data['prediction'], color='grey',marker='o')
-        plt.ylabel('Predicted Δ∆$G^{‡}$ (kJ/mol)', fontsize=13)
-        plt.xlabel('Experimental Δ∆$G^{‡}$ (kJ/mol)', fontsize=13)
-        plt.plot([-0.05, 11], [-0.05, 11], "k:")
 
-        plt.xticks(np.arange(0, 12, step=2))
-        plt.yticks(np.arange(0, 12, step=2))
-        plt.savefig("{}/regression.png".format(directory))
-        plt.show()
+        plt.rcParams.update()
+        #ref: http://www.futurile.net/2016/02/27/matplotlib-beautiful-plots-with-style/
+        # Set the style globally
+        # Alternatives include bmh, fivethirtyeight, ggplot,
+        # dark_background, seaborn-deep, etc
+        plt.style.use('seaborn-white')
+
+        plt.rcParams['font.family'] = 'serif'
+        plt.rcParams['font.serif'] = 'Ubuntu'
+        plt.rcParams['font.monospace'] = 'Ubuntu Mono'
+        plt.rcParams['font.size'] = 20
+        plt.rcParams['axes.labelsize'] = 20
+        plt.rcParams['axes.labelweight'] = 'bold'
+        plt.rcParams['axes.titlesize'] = 20
+        plt.rcParams['xtick.labelsize'] = 16
+        plt.rcParams['ytick.labelsize'] = 16
+        plt.rcParams['legend.fontsize'] = 20
+        plt.rcParams['figure.titlesize'] = 24
+
+        if directory.endswith("Regr"):
+            fig_title = directory.replace("Regr", "Regressor")
+        else:
+            fig_title = directory
+        titlename = fig_title.replace("_", "")
+
+        fig, ax = plt.subplots(figsize=(6, 6), dpi=300)
+        ax.scatter(data['known'], data['prediction'], s=60, alpha=0.6, edgecolors="k", color='darkblue')
+        ax.set_ylabel('Predicted $log(EC_{50})$')
+        ax.set_xlabel('Experimental $log(EC_{50})$')
+        ax.plot([-4, 2], [-4, 2], "k:")
+        ax.set_title(titlename)
+
+        # add metrics to plot
+        ax.text(0.05, 0.95, "R$^2$ = {:.2f}".format(R2), transform=ax.transAxes, fontsize=14, verticalalignment='top')
+        ax.text(0.05, 0.90, "Variance = {:.2f}".format(variance), transform=ax.transAxes, fontsize=14, verticalalignment='top')
+        ax.text(0.05, 0.85, "MSE = {:.2f}".format(MSE), transform=ax.transAxes, fontsize=14, verticalalignment='top')
+        ax.text(0.05, 0.80, "MAE = {:.2f}".format(MAE), transform=ax.transAxes, fontsize=14, verticalalignment='top')
+
+
+        fig.savefig("{}/regression.png".format(directory))
+        fig.show()
 
 def metrics_for_all_classes(directories=("AdaBoost", "DecisionTree", "ExtraTreesClassifier", "GaussianProcess", "LogisticRegression", "NearestNeighbors"), max_folds=10,
                             names=None, smiles=None):
@@ -1710,3 +1701,112 @@ def get_feature_names_from_column_transformers(ctransformer):
         trans_list = trans_list + [trans_name] * len(names)
 
     return new_feature_names
+
+def feature_categorization(features_df, feature_types="some_categorical", categorical_indxs=None):
+    '''
+
+    function to determine the type of scaling for the features
+
+    :param features_df: dataframe of original features
+    :param feature_types: are they all categorical, some categorical or non categorical features
+    :param categorical_indxs: indices of the categorial features. We sugguest the user provide the indices for the categorial features when feature_types="some_categorial". If not provided, the function will try to guess the categorial features automatically.
+    :return: new dataframe with scaled and one-hotencoded features
+    '''
+
+    log = logging.getLogger(__name__)
+    for column in features_df.columns:
+        if features_df[column].dtype == bool:
+            features_df[column] = features_df[column].astype(int)
+    
+    feature_columns = features_df.columns
+    # print(feature_columns)
+    # feature_types = "no_categorical"
+
+    # Backup
+    backup_feats_df = features_df.copy()
+    
+    # Automatic selection of categorical feaures
+    if categorical_indxs==None:
+        log.info("-----")
+        log.info("Categorical features not provided. Trying to guess the categorical features automatically.")
+        log.info("-----")
+        
+        categorical_indxs = []
+        for column in features_df:
+            arr = features_df[column]
+            if arr.dtype.name == 'int64':
+                categorical_indxs.append(features_df.columns.get_loc(arr.name))
+#                unique_values = arr.unique()
+#                if len(unique_values) == 1:
+#                    pass
+                # if the feature is not binary, then add it to the categorical features to be discretized
+                #if arr.unique() != [0, 1]:
+                #    if not arr.name.startswith("MPC"):
+                #        index_no = features_df.columns.get_loc(arr.name)
+                #        categorical_indxs.append(index_no)
+#                elif set(unique_values) == {0, 1}:
+#                    pass
+#                elif len(unique_values) > 2 or (0 not in unique_values or 1 not in unique_values):
+#                    if not arr.name.startswith("MPC"):
+#                        index_no = features_df.columns.get_loc(arr.name)
+#                        categorical_indxs.append(index_no)
+
+
+        categorical_features = [feature_columns[i] for i in range(len(feature_columns)) if i in categorical_indxs]
+        log.info("Automatically assigned categorical indices:\n{} {}".format(categorical_indxs, len(categorical_indxs)))
+        log.info("Automatically assigned categorical features:\n{} {}".format(categorical_features, len(categorical_features)))
+        log.info("**Please check if the automatic assignment is correct. If not, please provide the indices of the categorical features.**")
+        log.info("-----")
+
+
+    # No categorical only scale the data as numbers
+    if feature_types == "no_categorical":
+        mm_scaler = MinMaxScaler()
+        features_df = mm_scaler.fit_transform(features_df)
+        log.info(pd.DataFrame(features_df, columns=feature_columns))
+        features_df = pd.DataFrame(features_df, columns=feature_columns)
+
+    # Some categorical - Need to provide the indexes
+    elif feature_types == "some_categorical":
+        numeric_features = [feature_columns[i] for i in range(len(feature_columns)) if i not in categorical_indxs]
+        numerical_transformer = MinMaxScaler()
+        categorical_features = [feature_columns[i] for i in range(len(feature_columns)) if i in categorical_indxs]
+        categorical_transformer = OneHotEncoder(handle_unknown='ignore')
+        if any(ent in categorical_features for ent in numeric_features):
+            log.warning("WARNING - numeric and categorical feature specififed overlap")
+            log.info(numeric_features)
+            log.info(categorical_features)
+        else:
+            log.info("Numerical features:\n{} {}".format(numeric_features, len(numeric_features)))
+            log.info("Categorical features:\n{} {}".format(categorical_features, len(categorical_indxs)))
+        
+        preprocessor = ColumnTransformer(
+            transformers=[
+                ("numerical", numerical_transformer, numeric_features),
+                ('categorical', categorical_transformer, categorical_features)])
+
+        features_df = preprocessor.fit_transform(features_df)
+        print(features_df)
+        feature_names = get_feature_names_from_column_transformers(preprocessor)
+        categorical_indxs = [i for i in range(len(numeric_features), len(feature_names))]
+        log.info(feature_names)
+
+        log.info(pd.DataFrame(features_df, columns=feature_names))
+        features_df = pd.DataFrame(features_df, columns=feature_names)
+        log.info("categorical indexes {}".format(categorical_indxs))
+        log.info("Categorical features start on column name {} and end on {}".format(
+            features_df.columns[categorical_indxs[0]], features_df.columns[categorical_indxs[-1]]))
+
+    # All categorical
+    elif feature_types == "categorical":
+        categorical_transformer = OneHotEncoder(handle_unknown='ignore')
+        features_df = categorical_transformer.fit_transform(features_df).toarray()
+        feature_names = [categorical_transformer.get_feature_names(feature_columns)]
+        features_df = pd.DataFrame(features_df, columns=feature_names)
+        log.info(features_df)
+
+    # No scaling or other encoding
+    else:
+        log.info("No scaling")
+
+    return features_df

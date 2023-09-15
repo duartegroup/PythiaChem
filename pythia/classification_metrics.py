@@ -4,6 +4,8 @@
 import pandas as pd
 import numpy as np
 
+import joblib
+
 # sklearn
 import sklearn
 from sklearn.metrics import confusion_matrix
@@ -12,6 +14,7 @@ from sklearn.metrics import roc_curve
 from sklearn.metrics import RocCurveDisplay
 from sklearn.metrics import precision_recall_curve
 from sklearn.metrics import PrecisionRecallDisplay
+from sklearn.inspection import permutation_importance
 
 # imbalanced
 from imblearn.metrics import classification_report_imbalanced 
@@ -378,7 +381,7 @@ def calculate_multi_label_confusion_based_metrics(cmtx=None, df=None, predicted_
 
 def calculate_confusion_based_metrics(cmtx=None, df=None, predicted_column_name="prediction", known_column_name="known", probabilities_column_name=None, 
         probabilities=None, labels=(0,1), positive_label=1, imbalanced=False, verbose=False, key=1, plt_filename=None, all_classes=True, get_roc_curve=True,
-                                    get_pr_curve=True, vmin=None, vmax=None, col_map="viridis", annotate=True,title=None):
+                                    get_pr_curve=True, vmin=None, vmax=None, col_map="Blues", annotate=True,title=None):
     """
     :param cmtx: np array or dict - confusion matrix from sklearn or confusion_matrix_to_dict()
     :param df: pandas dataframe - datafrom of two columns one predicted data the other ground truth known classes
@@ -520,3 +523,67 @@ def calculate_confusion_based_metrics(cmtx=None, df=None, predicted_column_name=
         log.info("{}".format("\n".join(["{}:\n{}".format(k, v) for k, v in output_metrics.items()])))
 
     return output_metrics
+
+
+
+
+def calculate_permutation_importance(model_file, x, y, n_repeats=5, n_toplot =7, save=True, random_seed=None):
+    """
+    Calculate the permutation importance of the features of a model.
+    Parameters:
+    model_file: the name of the model .sav file
+    x: the features
+    y: the target
+    n_repeats: the number of times to repeat the permutation. Default is 5.
+    n_toplot: the number of features to plot. Default is 7.
+    save: whether to save the plot. Default is True.
+    random_seed: the random seed. Default is None.
+
+    Returns:
+    df: the dataframe of feature importance   
+    
+    """
+    model_name = model_file.split(".")[0].replace("finalized_MLmodel_", "").replace("_", " ")
+    print(model_name)
+    clf = joblib.load(model_file)
+    importance = permutation_importance(clf, x, y, n_repeats=n_repeats, random_state=random_seed)
+    
+    features = x.columns
+
+    # make a dataframe with two columns from two lists features and feature_importance
+    df = pd.DataFrame({'feature': features, 'importance': importance.importances_mean, 'importance_std': importance.importances_std})
+    # add a column with absolute values of feature importance
+    df['abs_importance'] = df['importance'].abs()
+    # sort the dataframe by absolute value of feature importance in descending order
+    df = df.sort_values('abs_importance', ascending = False).reset_index(drop=True)
+    
+    # set type of the feature column as string
+    df['feature'] = df['feature'].astype(str)
+
+    if save:
+        df.to_csv("feature_importance_permutation_{}.csv".format(model_name))
+        print("Saved feature importance to feature_importance_permutation_{}.csv".format(model_name))
+
+    # plot the N most important features
+    N = n_toplot
+    plt.figure(figsize=(7,6), dpi=300)
+    plt.title("{}".format(model_name))
+    plt.bar(df['feature'][:N], df['importance'][:N], align='center', color = 'lightgrey')
+    # add error bars
+    plt.errorbar(df['feature'][:N], df['importance'][:N], yerr=df['importance_std'][:N], fmt='none', capsize=3, color = 'darkgrey')
+    plt.xticks(rotation=90)
+    plt.ylabel('Importance')
+    plt.xlabel('Feature')
+    plt.tight_layout()
+    
+    if save:
+        plt.savefig("feature_importance_permutation_{}.png".format(model_name))
+        print("Saved feature importance plot to feature_importance_permutation_{}.png".format(model_name))
+
+    plt.show() 
+
+    return df
+
+
+
+

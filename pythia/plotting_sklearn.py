@@ -161,7 +161,7 @@ def plot_pr_curve(probas, y_test, title="Precision Recall Curve", x_lab="Recall"
     else:
         return axes, data
             
-def plot_confusion_matrix(cmx, axes=None, col_map="RdYlBu", labels=(0, 1), title="Confusion Matrix", x_label="Predicted Class", y_label="Known Class", fontsize=20,
+def plot_confusion_matrix(cmx, axes=None, col_map="Blues", labels=(0, 1), title="Confusion Matrix", x_label="Predicted Class", y_label="Known Class", fontsize=20,
                           annotate = False, vmin=None, vmax=None):
     """
     """
@@ -170,8 +170,8 @@ def plot_confusion_matrix(cmx, axes=None, col_map="RdYlBu", labels=(0, 1), title
     log.info("{}\n{}".format(cmx, labels))
     
     cmx_df = pd.DataFrame(data=cmx, columns=labels, index=labels)
-    sns.set(font_scale=1.4)
-    axes = sns.heatmap(cmx_df, annot=True, ax=axes, fmt="d")
+    sns.set(font_scale=2.4)
+    axes = sns.heatmap(cmx_df, annot=True, ax=axes, fmt="d", cmap=col_map)
     axes.set_title(title, fontsize=fontsize+2)
     axes.set_xlabel(x_label, fontsize=fontsize+1)
     axes.set_ylabel(y_label, fontsize=fontsize+1)
@@ -181,7 +181,7 @@ def plot_confusion_matrix(cmx, axes=None, col_map="RdYlBu", labels=(0, 1), title
 
 
 def plot_metrics(df, predicted_column_name="prediction", known_column_name="known", probabilities=None,
-                 positive_label=1, labels=(0, 1), name="metric_plots.png", figsize=None, fontsize=20, col_map="viridis",
+                 positive_label=1, labels=(0, 1), name="metric_plots.png", figsize=None, fontsize=30, col_map="Blues",
                  all_classes=True, roc_curve=True, pr_curve=True, annotate=True, vmin=None, vmax=None, title=None):
     """
     Function to plot confusion matrix, roc curves and precision reacall curve
@@ -266,4 +266,4 @@ def plot_metrics(df, predicted_column_name="prediction", known_column_name="know
                                     col_map=col_map, fontsize=fontsize)
 
         plt.tight_layout()
-        plt.savefig(name)
+        plt.savefig(name, dpi=300)

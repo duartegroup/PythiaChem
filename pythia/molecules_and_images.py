@@ -2,6 +2,8 @@
 from datetime import datetime
 import pandas as pd
 import numpy as np
+import os
+import joblib
 
 #RDKit
 from rdkit import Chem
@@ -10,6 +12,15 @@ from rdkit.Chem.Draw import IPythonConsole
 from rdkit.Chem import Draw
 from rdkit.Chem.Draw import DrawingOptions
 from rdkit.Chem import Descriptors, rdMolDescriptors
+from rdkit.Chem import rdCoordGen
+from rdkit.Chem.Draw import rdMolDraw2D
+from rdkit import DataStructs
+
+# Matplotlib
+import matplotlib.pyplot as plt
+from matplotlib_venn import venn3, venn3_circles
+from matplotlib_venn import venn2, venn2_circles
+
 
 # Image libraries
 try:
@@ -22,7 +33,7 @@ from io import BytesIO
 import logging
 
 
-def smiles_to_molcule(s, addH=True, canonicalize=True, threed=True, add_stereo=False, remove_stereo=False, random_seed=10459, verbose=False):
+def smiles_to_molcule(s, addH=False, canonicalize=True, threed=True, add_stereo=False, remove_stereo=False, random_seed=10459, verbose=False):
     """ 
     :param s: str - smiles string
     :param addH: bool - Add Hydrogens or not
@@ -45,15 +56,15 @@ def smiles_to_molcule(s, addH=True, canonicalize=True, threed=True, add_stereo=F
                 log.info("Atom {} {} in molecule from smiles {} tag will be cleared. "
                         "Set properties {}.".format(atom.GetIdx(), atom.GetSymbol(), s, atom.GetPropsAsDict(includePrivate=True, includeComputed=True)))
 
-    if addH is True:
-        mol = Chem.rdmolops.AddHs(mol)
-
     if add_stereo is True:
         rdCIPLabeler.AssignCIPLabels(mol)
 
-
-    if threed:
-        AllChem.EmbedMolecule(mol, randomSeed=random_seed)
+    if addH is True:
+        mol = Chem.rdmolops.AddHs(mol)
+        if threed is True:
+            AllChem.EmbedMolecule(mol, randomSeed=random_seed)
+    if addH is False:
+        threed = False
 
     return mol 
     
@@ -254,3 +265,382 @@ def twod_mol_align(molecules, template_smarts=None, template_smiles=None):
         rms = AllChem.AlignMol(m, temp_mol, atomMap=list(zip(mol_atom_inxes, temp_atom_inxes)))
 
     return molecules
+
+
+def substructure_match(substructure_smarts, mols):
+
+    log = logging.getLogger(__name__)
+
+    matches = []
+    indices = []
+
+    patt = Chem.MolFromSmarts(substructure_smarts)
+    for i, mol in enumerate(mols):
+        if mol.HasSubstructMatch(patt):
+            indices.append(i)
+            matches.append(mol)
+
+    log.info(f"Found {len(matches)} matches")
+
+    return matches, indices
+
+def overlap_venn(dict):
+    n_substructure = len(dict.keys())
+    substructure_name = list(dict.keys())
+    
+    # Overlap between 2 sets of molecules with different substructure patterns
+    for i in range(n_substructure-1):
+        for j in range(n_substructure):
+            if j > i:
+                intersect_i = set(dict[substructure_name[i]]).intersection(set(dict[substructure_name[j]]))
+                if len(intersect_i) != 0:
+                    im_overlap = Chem.Draw.MolsToGridImage(intersect_i,molsPerRow=5,
+                                                        subImgSize=(800,800), returnPNG=True)
+                    
+                    fig, ax = plt.subplots()
+                    plt.tight_layout()
+                    
+                    v = venn2([set(dict[substructure_name[i]]), set(dict[substructure_name[j]])], 
+                        (substructure_name[i], substructure_name[j]), 
+                        set_colors=('lightblue', 'grey'),
+                            ax = ax)
+                    
+                    fig_name = 'fig_venn2_' + substructure_name[i] + '_' + substructure_name[j] + '.png'
+                    plt.savefig(fig_name)
+                    
+                    plt.show()
+
+
+    # Overlap between 3 sets of molecules with different substructure patterns
+    for i in range(n_substructure-2):
+        for j in range(n_substructure-1):
+            for k in range(n_substructure):
+                if k > j > i:
+                    intersect_l = set(dict[substructure_name[i]]).intersection(set(dict[substructure_name[j]])).intersection(set(dict[substructure_name[k]]))
+                    if len(intersect_l) != 0:
+                        fig, ax = plt.subplots()
+                        plt.tight_layout()
+                        v = venn3([set(dict[substructure_name[i]]), set(dict[substructure_name[j]]), set(dict[substructure_name[k]])],
+                            (substructure_name[i], substructure_name[j], substructure_name[k]), 
+                            set_colors=('lightblue', 'grey', 'lightpink'),
+                                ax = ax)
+                        
+                        fig_name = 'fig_venn3_' + substructure_name[i] + '_' + substructure_name[j] + '_' + substructure_name[k] + '.png'
+                        plt.savefig(fig_name)
+                        
+                        plt.show()              
+                    
+    return
+
+def tanimoto_plot(smiles, title=None, figsize=(6,6), dpi=300, filename=None, cmap='Blues'):
+    """Plot tanimoto similarity matrix of fingerprints.
+    
+    Parameters
+    ----------
+    smiles : list
+        List of SIMLES.
+    title : str, optional
+        Title of the figure. Default is None.
+    figsize : tuple, optional
+        Size of the figure. Default is (6,6).
+    dpi : int, optional
+        Resolution of the figure. Default is 300.
+    filename : str, optional
+        Name of the file. The output file will be named fig_similarity_{filename}.png. Default is None.  
+    cmap : str, optional
+        Colormap. Default is 'Blues'.
+    
+    Returns
+    -------
+    similarity matrix dataframe : pandas dataframe
+        Dataframe containing the similarity matrix.
+    """
+	
+
+    # convert smiles to mol
+    mols =[Chem.MolFromSmiles(smi) for smi in smiles]
+
+    # generate fingerprints
+    fps = [AllChem.GetMorganFingerprint(m,2) for m in mols]
+
+    # the list for the dataframe
+    qu, ta, sim = [], [], []
+    qu_n, ta_n = [], []
+
+    # compare all fp pairwise without duplicates
+    for n in range(len(fps)-1): # -1 so the last fp will not be used
+        s = DataStructs.BulkTanimotoSimilarity(fps[n], fps[n+1:]) # +1 compare with the next to the last fp
+        #print(smiles_list[n], smiles_list[n+1:]) # witch mol is compared with what group
+
+        # collect the SMILES and values
+        for m in range(len(s)):
+            qu_n.append(n)
+            ta_n.append(m)
+            qu.append(smiles[n])
+            ta.append(smiles[n+1:][m])
+            sim.append(s[m])
+    print()
+
+    # build the dataframe and sort it
+    d = {'query':qu, 'target':ta, 'Similarity':sim}
+    df_final = pd.DataFrame(data=d)
+    dlabel = {'query':qu_n, 'target':ta_n, 'Similarity':sim}
+    df_label_final = pd.DataFrame(data=dlabel)
+
+    # save as csv
+    df_final.to_csv('fingerprints.csv', index=False, sep=',')
+    df_label_final.to_csv('fingerprints_label.csv', index=False, sep=',')
+
+    # visualize structural similarity
+    similarity_array = np.zeros(shape=(len(fps), len(fps)))
+
+    # compare all fp pairwise without duplicates
+    for n, fp in enumerate(fps): # -1 so the last fp will not be used
+        s = DataStructs.BulkTanimotoSimilarity(fp, fps)
+        similarity_array[n, :] = np.array(s)
+
+    # print mean and std of the similarity array
+    print('mean: ', np.mean(similarity_array))
+    print('std: ', np.std(similarity_array))
+
+    # plot the similarity array
+    plt.figure(figsize=figsize, dpi=dpi)
+    im = plt.imshow(similarity_array,cmap=cmap)
+    plt.title(f'Tanimoto similarity {title}')
+    plt.colorbar(im, spacing = 'uniform')
+    plt.clim(0, 1)
+    plt.savefig(f'fig_similarity_{filename}.png', dpi=dpi)
+    plt.show()
+
+    return df_label_final
+    
+def tanimoto_similarity_comparison(fp_list1, fp_list2, title=None, figsize=(12,4), dpi=300, filename='train_test', cmap='Blues'):
+    """Plot tanimoto similarity matrix of fingerprints.
+    
+    Parameters
+    ----------
+    fp_list1 : list
+        List of fingerprints.
+    fp_list2 : list
+        List of fingerprints.
+    title : str, optional
+        Title of the figure. Default is None.
+    figsize : tuple, optional
+        Size of the figure.
+    dpi : int, optional
+        Resolution of the figure. Default is 300.
+    filename : str, optional
+        Name of the file. The output file will be named fig_similarity_{filename}.png. Default is 'train_test'.
+    cmap : str, optional
+        Colormap. Default is 'Blues'.
+    
+    Returns
+    -------
+    None.
+    """
+	
+	
+	# Calculate the similarity matrix within fp_list1
+    similarity_matrix1 = np.zeros((len(fp_list1), len(fp_list1)))  
+    for i in range(len(fp_list1)):
+        for j in range(len(fp_list1)):
+            similarity_matrix1[i][j] = DataStructs.FingerprintSimilarity(fp_list1[i], fp_list1[j])
+            
+    # Calculate the similarity matrix within fp_list2
+    similarity_matrix2 = np.zeros((len(fp_list2), len(fp_list2)))
+    for i in range(len(fp_list2)):
+        for j in range(len(fp_list2)):
+            similarity_matrix2[i][j] = DataStructs.FingerprintSimilarity(fp_list2[i], fp_list2[j])
+    
+    # Calculate the similarity matrix between fp_list1 and fp_list2
+    similarity_matrix = np.zeros((len(fp_list1), len(fp_list2)))
+    for i in range(len(fp_list1)):
+        for j in range(len(fp_list2)):
+            similarity_matrix[i][j] = DataStructs.FingerprintSimilarity(fp_list1[i], fp_list2[j])
+
+    # Plot the similarity matrix.
+    fig, ax = plt.subplots(1,3, figsize=figsize, dpi=dpi)
+    fig.suptitle(title, fontsize=16)
+    
+    ax[0].imshow(similarity_matrix1, aspect='1', cmap=cmap, interpolation='nearest')
+    ax[0].set_title('Train set')
+
+    ax[1].imshow(similarity_matrix2, aspect='1', cmap=cmap, interpolation='nearest')
+    ax[1].set_title('Test set')
+
+    ax[2].imshow(similarity_matrix, aspect='1', cmap=cmap, interpolation='nearest')
+    ax[2].set_title('Train vs test set')
+    ax[2].set_xlabel('Test set')
+    ax[2].set_ylabel('Train set')
+    
+    # show colorbar
+    fig.colorbar(ax[2].imshow(similarity_matrix, aspect='1', cmap=cmap, interpolation='nearest'), location='right')
+    
+    plt.tight_layout()
+    plt.savefig(f'fig_similarity_{filename}.png', dpi=dpi)
+    plt.show()
+    
+    return
+
+
+
+
+
+
+def get_fingerprints_bit_importance(model_file, features_df, non_fingerprint_features=None, nBits=1024):
+    """
+    This function takes in a model file, a list of SMILES strings, and a dataframe of features. It returns a dataframe of the feature importance of each bit in the fingerprint.
+    Parameters:
+        model_file (str): the name of the model file. For example, 'model_ExtraTreesClassifier.sav'.
+        features_df (dataframe): a dataframe of the features used to train the model.
+        non_fingerprint_features (list): a list of the names of the features that are not morgan fingerprints. Default is None. If you used custom features, you need to specify the names of those features here.
+        nBits (int): the number of bits used to generate the morgan fingerprints. Default is 1024. This should be the same as the nBits used to generate the features.
+    Returns:
+        df: a dataframe of the feature importance of each bit in the fingerprint.
+    """
+    model_name = model_file.split(".")[0].replace("model_", "")
+    print('Model name is: ', model_name)
+
+    # load the model from disk
+    model = joblib.load(model_file)
+
+    # extract the feature importances using the feature_importances_ attribute from sklearn
+    try:
+        importances = model.feature_importances_
+    except:
+        importances = model.coef_
+
+    # sort the feature importances in descending order
+    #indices = np.argsort(importances)[::-1]
+    #print(indices)
+
+    # get the names of the features from the original training data
+    features = features_df.columns
+
+    # create a list of feature names and their importance
+    feature_importance = []
+    for f in range(features_df.shape[1]):
+        #feature_importance.append((features[indices[f]], importances[indices[f]]))
+        feature_importance.append((features[f], importances[f]))
+    df_feature_importance_all = pd.DataFrame(feature_importance, columns=["feature", "importance"])
+
+    if non_fingerprint_features is None:
+        df_feature_importance = df_feature_importance_all
+    else:
+        # remove features that are not morgan fingerprints (i.e. the custom features we added)
+        #df_feature_importance = df_feature_importance_all[df_feature_importance_all["feature"].isin(non_fingerprint_features) == False]
+
+        # rewrite this using pandas.concat
+        df_feature_importance = pd.concat([df_feature_importance_all[df_feature_importance_all["feature"].isin(non_fingerprint_features) == False]])
+
+    # for the bits that are all 0s, add them back to the dataframe with importance 0
+    for i in range(nBits):
+        if i not in df_feature_importance["feature"].values:
+            #df_feature_importance = df_feature_importance.append({"feature": i, "importance": 0}, ignore_index=True)
+            #df = df_feature_importance.append({"feature": i, "importance": 0}, ignore_index=True)
+            #print(i)
+            df_feature_importance = pd.concat([df_feature_importance, pd.DataFrame([{"feature": i, "importance": 0}])], ignore_index=True)
+
+    df = df_feature_importance.sort_values(by=["feature"])
+    print(len(df.feature))
+    # save the feature importance to a csv file
+    df.to_csv(model_name + "_feature_importance.csv", index=False)
+    print("Feature importance saved to " + model_name + "_feature_importance.csv")
+
+    return df
+
+
+    
+
+
+def plot_fingerprints_bit_importance(smiles, df_feature_importance, radius=2, nBits=1024, nCol=5, name=None, plot=False, show=False):
+    """
+    Plot the bit importance for a given list of smiles from a trained model. 
+    NOTE: Currently, this only supports plotting bit info map of Morgan fingerprints.
+    Parameters:
+        smiles: list of smiles
+        df_feature_importance: dataframe with the feature importance
+        radius: radius of the Morgan fingerprint. Default: 2. This is the same as the radius used for training the model.
+        nBits: number of bits of the Morgan fingerprint. Default: 1024. This is the same as the nBits used for training the model.
+        nFeats: number of features to plot. Default: 1024. If nFeats >= nBits, then all the features are plotted. 
+        nCol: number of molecules per row to plot for the fingerprint bits. Default: 5.
+        name: directory to save the plots: "analysis_fingerprints_bits_importance_{name}"
+        show: plot the plot. Default: False. If True, the plot is plotted.
+        show: show the plot. Default: False. If True, the plot is shown.
+    Returns:
+        None
+    """
+    savedir="analysis_fingerprints_bits_importance_" + str(name) 
+    if not os.path.exists(savedir):
+        os.makedirs(savedir)
+        print("Created directory {}".format(savedir))
+    else:
+        print("Directory {} already exists".format(savedir))
+
+    # get the top nFeats features
+    topfeats = df_feature_importance.index.tolist()
+    topfeats_importance = df_feature_importance['importance'].tolist()
+    topfeats_names = df_feature_importance['feature'].tolist()
+    #print("N features: {}".format(len(topfeats)))
+
+    # loop over the smiles
+    n_mols = len(smiles)
+    print("Plotting the bit importance for {} molecules".format(n_mols))
+    
+    for i in range(n_mols):
+        smi = smiles[i]
+        #print(smi)
+        try: 
+            mol = Chem.MolFromSmiles(smi)
+
+            # get Morgan fingerprint with bitInfo from the mol object
+            bitinfo={}
+            fp = AllChem.GetMorganFingerprintAsBitVect(mol, radius, nBits, useFeatures=True, bitInfo=bitinfo)
+            arr = np.zeros((1,))
+            DataStructs.ConvertToNumpyArray(fp, arr)
+            onbit = [bit for bit in bitinfo.keys()]
+
+            # create a list with the bit info and the feature name
+            importantonbits = list(set(onbit) & set(topfeats))
+
+            # sort by importance
+            importantonbits = sorted(importantonbits, key=lambda x:topfeats_importance[topfeats.index(x)], reverse=True)
+            print(importantonbits)
+
+            # get the bitId and the feature name
+            tpls = [(mol, x, bitinfo) for x in importantonbits]
+
+
+            topimportances = [topfeats_importance[x] for x in importantonbits]
+            #print(topimportances)
+
+            # legend shows both the bitId and the importance
+            legend = ["{} ({:0.4f})".format(x[1], x[0]) for x in zip(topimportances, importantonbits)]
+
+
+            if plot==True:
+                # plot the molecule and the fingerprint bits with the importances
+                fig, ax = plt.subplots(1, 2, dpi = 300, gridspec_kw={'width_ratios': [1, 6]}, figsize=(10, 6))
+                fig.suptitle("Molecule {}".format(i))
+                # draw the molecule on the left
+                im = Draw.MolToImage(mol)
+                ax[0].imshow(im)
+                ax[0].axis("off")
+                # draw the Morgan fingerprint with the bit info on the right
+                p = Draw.DrawMorganBits(tpls, legends = legend, molsPerRow=nCol, subImgSize=(200,200))
+                ax[1].imshow(p)
+                ax[1].axis("off")
+
+                plt.tight_layout()
+                
+                # save the figure as pdf to the savedir
+                fig.savefig(os.path.join(savedir, "mol_{}.pdf".format(i)), dpi=300)
+                print("Saved figure to {}".format(os.path.join(savedir, "mol_{}.pdf".format(i))))
+
+                if show==True:
+                    plt.show()              
+                if show==False:
+                    plt.close()
+        except:
+            print("Error with molecule {}".format(i))
+            pass
