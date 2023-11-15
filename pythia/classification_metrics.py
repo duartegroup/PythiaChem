@@ -24,7 +24,7 @@ from imblearn.metrics import sensitivity_specificity_support
 try:
     import scikitplot as skplt
 except ModuleNotFoundError:
-    print("Scikit plot not avaliable not all plotting features are available")
+    print("Scikit plot not avaliable")
 
 from . import plotting_sklearn as pltsk
 
@@ -122,6 +122,8 @@ def accuracy_percentage(df, prediction_column="prediction", known_column="known"
 
 def g_mean(cm_d):
     """
+    Function to calculate geometric mean
+    :param cm_d: confusion matrix dictionary from get_confusion_matrix
     """
 
     sensitivity = tpr(cm_d)
@@ -134,7 +136,7 @@ def g_mean(cm_d):
 
 def accuracy(cm):
     """
-    Function to calculate the accuracy from a classification using a confusion matrix
+    Function to calculate the accuracy 
     :param cm: confusion matrix dataframe from sklearn or dictionary from get_confusion_matrix(return_dict=True)
     """
     if isinstance(cm, dict):
@@ -145,16 +147,10 @@ def accuracy(cm):
 
     return ac
 
-def class_accuracy(cm):
-    """
-    """
-    cm_acc = cm.diagonal()/matrix.sum(axis=1)
-
-    return cm_acc.diagonal()
 
 def tpr(cm_d):
     """
-    Function to calculate the true postive rate also known as sensitivity
+    Function to calculate the true postive rate 
     :param cm_d: confusion matrix dictionary from get_confusion_matrix(return_dict=True)
     """
     return cm_d["tp"] / (cm_d["tp"] + cm_d["fn"])
@@ -237,89 +233,6 @@ def auc(metric1, metric2):
     """
 
     return sklearn.metrics.auc(metric1, metric2)
-
-
-def old_plot_metrics(df, predicted_column_name="prediction", known_column_name="known", probabilities_column_name="prob", positive_label=1, labels=(0,1), name="metric_plots.png"):
-    """
-    Plot the confusion matriz, ROC curve and precision recall curve on one diagram and save to file
-    :param df: pandas dataframe - datafrom of two columns one predicted data the other ground truth known classes
-    :param predicted_column_name: str - the column name containing the predicted classes
-    :param known_column_name: str - the column name containing the ground truth known classes
-    :param probabilities_column_name: str - the column name containing a classes predicted probabilities (sklearn predict_proba() output)
-    :param positive_label: str/int/float - label applied for the positive class
-    :param labels: tuple - the labels used for the classes
-    :param name: str - name of the file to save the plot to
-    """
-
-    # Precision recall curve data
-
-    cmat = get_confusion_matrix(df, predicted_column_name="prediction", known_column_name="known", labels=labels)
-
-    fpr, tpr, roc_thresholds = roc_curve(df[known_column_name].values,
-                                         df[probabilities_column_name].values,
-                                         pos_label=positive_label)
-    roc_auc = auc(fpr, tpr)
-
-    precision, recall, pr_thresholds = precision_recall_curve(df[known_column_name].values,
-                                                         df[probabilities_column_name].values,
-                                                         pos_label=positive_label)
-
-    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(30, 10))
-    ConfusionMatrixDisplay(cmat).plot(ax=ax1)
-    RocCurveDisplay(fpr=fpr, tpr=tpr, roc_auc=roc_auc).plot(ax=ax2)
-    PrecisionRecallDisplay(precision=precision, recall=recall).plot(ax=ax3)
-    plt.savefig(name)
-
-def plot_metrics_skplot(df, predicted_column_name="prediction", known_column_name="known", probabilities=None, positive_label=1, labels=(0,1), name="metric_plots.png", figsize=(30,10), textsize=15):
-    """
-    Plot using skplot library the confusion matrix, ROC curve and precision recall curve on one diagram and save to file
-    :param df: pandas dataframe - datafrom of two columns one predicted data the other ground truth known classes
-    :param predicted_column_name: str - the column name containing the predicted classes
-    :param probabilities: np array - class probability prediction from sklearn predict_proba() output
-    :param positive_label: str/int/float - label applied for the positive class
-    :param labels: tuple - the labels used for the classes
-    :param name: str - name of the file to save the plot to
-    :param figsize: tuple - size of the figure
-    :param textsize: int - text size on the plots
-    """
-
-    log = logging.getLogger(__name__)
-
-    log.info(df)
-    
-    if len(set(df[known_column_name].values)) == 2:
-        plot_micro = False
-        plot_macro = False
-    else:
-        plot_micro = True
-        plot_macro = False
-
-    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=figsize)
-
-    skplt.metrics.plot_confusion_matrix(df[known_column_name].values,
-                                        df[predicted_column_name].values,
-                                        ax=ax1,
-                                        labels=labels,
-                                        text_fontsize=textsize,
-                                        title_fontsize=textsize)
-
-    skplt.metrics.plot_roc(df[known_column_name].values,
-                                 probabilities,
-                                 ax=ax2,
-                                 text_fontsize=textsize,
-                                 title_fontsize=textsize,
-                                 plot_micro=plot_micro,
-                                 plot_macro=plot_macro)
-
-    skplt.metrics.plot_precision_recall(df[known_column_name].values,
-                                        probabilities,
-                                        ax=ax3,
-                                        text_fontsize=textsize,
-                                        title_fontsize=textsize,
-                                        plot_micro=plot_micro)
-
-
-    plt.savefig(name)
 
 def calculate_multi_label_confusion_based_metrics(cmtx=None, df=None, predicted_column_name="prediction", known_column_name="known", 
         probabilities_column_name=None, probabilities=None, labels=(0,1), positive_label=1, imbalanced=False, verbose=False, plt_filename=None):
@@ -443,7 +356,6 @@ def calculate_confusion_based_metrics(cmtx=None, df=None, predicted_column_name=
     output_metrics["f2"] = f_two
     mcc = matthews_correlation_coefficient(cmtx)
     output_metrics["matthews_correlation_coefficient"] = mcc
-    # Own function calls only calculate for one class classification report does it for both directly
     precis = precision(cmtx)
     output_metrics["precision"] = precis
     rec = recall(cmtx)
@@ -512,7 +424,7 @@ def calculate_confusion_based_metrics(cmtx=None, df=None, predicted_column_name=
         output_metrics["pr_thresholds"] = pr_thresholds
 
         #roc_auc = sklearn.metrics.roc_auc_score(df[known_column_name].values, df[probabilities_column_name].values)
-        # problematic but general
+        
         roc_auc = auc(fposr, tposr)
         output_metrics["roc_auc"] = roc_auc
         pr_auc = auc(r, p)
