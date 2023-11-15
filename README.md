@@ -54,6 +54,6 @@ python -m ipykernel install --user --name=pythia
 
 ### Installation by pip
 ```Bash
-git clone https://github.com/duartegroup/PythiaCHEM.git
+git clone https://github.com/duartegroup/PythiaChem.git
 pip install .
 ```
