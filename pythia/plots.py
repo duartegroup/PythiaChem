@@ -1,5 +1,10 @@
 #!/usr/bin/ent python
 
+# parts of this code are inspired by Chemical Space Analysis and Property Prediction for Carbon Capture Amine Molecules.
+#https://chemrxiv.org/engage/chemrxiv/article-details/6465d217f2112b41e9bebcc8
+#https://zenodo.org/records/10213104
+#https://github.com/flaviucipcigan/ccus_amine_prediction_workflow
+
 # numerics and data packages
 import pandas as pd
 import numpy as np
@@ -33,6 +38,10 @@ import logging
 
 def roc_curve_data(ytest, probs, pos_label=1):
     """
+    function to get the data to plot the roc curve
+    :param ytest: this is the known ground truth values
+    :param probs: the probabilities of a point belonging to class 0 or class 1
+    :param pos_label=1: just to make sure the possitive class is class 1
     """
     
     log = logging.getLogger(__name__)
@@ -47,6 +56,10 @@ def plot_roc_curve(probas, y_test, title="ROC Curve", x_lab="False Positive Rate
                   col_map="viridis", savefigure=False, filename=None, size=(10,10), fontsize=15,
                   return_raw_data=False):
     """
+    function to plot roc curve
+    :param probs: the probabilities of a point beloning to class 0 or 1
+    :param y_test: this is the known ground truth values
+    :param plot_class = 'all' do you want to plot both for the positive and negative class or only one?
     """
     
     log = logging.getLogger(__name__)
@@ -98,6 +111,10 @@ def plot_roc_curve(probas, y_test, title="ROC Curve", x_lab="False Positive Rate
 
 def precision_recall_data(y_test, probs, pos_label=1):
     """
+    function to get the data to plot the precision recall curve
+    :param ytest: this is the known ground truth values
+    :param probs: the probablities of a point belonging to class 0 or 1
+    :param pos_label=1: just to make sure the possitive class is class 1
     """
     log = logging.getLogger(__name__)
     prec, rec, thresholds = precision_recall_curve(y_test, probs, pos_label=pos_label)
@@ -113,6 +130,10 @@ def plot_pr_curve(probas, y_test, title="Precision Recall Curve", x_lab="Recall"
                   col_map="viridis", savefigure=False, filename=None, size=(10,10), fontsize=15,
                   return_raw_data=False):
     """
+    function to plot precision recall curve
+    :param probs: the probabilities of a point beloning to class 0 or 1
+    :param y_test: this is the known ground truth values
+    :param plot_class = 'all' do you want to plot both for the positive and negative class or only one?
     """
     
     log = logging.getLogger(__name__)
@@ -164,6 +185,8 @@ def plot_pr_curve(probas, y_test, title="Precision Recall Curve", x_lab="Recall"
 def plot_confusion_matrix(cmx, axes=None, col_map="Blues", labels=(0, 1), title="Confusion Matrix", x_label="Predicted Class", y_label="Known Class", fontsize=20,
                           annotate = False, vmin=None, vmax=None):
     """
+    function to plot the confusion matrix
+    :param cmx: the confusion matrix calculated before
     """
     log = logging.getLogger(__name__)
     
@@ -185,6 +208,11 @@ def plot_metrics(df, predicted_column_name="prediction", known_column_name="know
                  all_classes=True, roc_curve=True, pr_curve=True, annotate=True, vmin=None, vmax=None, title=None):
     """
     Function to plot confusion matrix, roc curves and precision reacall curve
+    :param df: pandas dataframe - two columns one predicted data the other ground truth
+    :param predicted_column_name: str - the column name containing the predicted class
+    :param known_column_name: str- the column name containing the ground truth
+    :param probabilities: the probabilities of a point belonging to class 0 or 1
+    :param labels: tuple - the label used for the class
     """
 
     log = logging.getLogger(__name__)
