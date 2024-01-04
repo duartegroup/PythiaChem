@@ -1,5 +1,11 @@
 #!/usr/bin/env python
 
+# parts of this code are inspired by Chemical Space Analysis and Property Prediction for Carbon Capture Amine Molecules.
+#https://chemrxiv.org/engage/chemrxiv/article-details/6465d217f2112b41e9bebcc8
+#https://zenodo.org/records/10213104
+#https://github.com/flaviucipcigan/ccus_amine_prediction_workflow
+
+
 # Python packages and utilities
 import os
 from datetime import datetime
