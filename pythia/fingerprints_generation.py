@@ -36,7 +36,7 @@ import logging
 
 
 # own modules
-from . import molecules_and_images as mi
+from . import molecules_and_structures as mi
 
 def rdkit_fingerprints(smiles):
     """
