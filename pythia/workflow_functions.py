@@ -724,12 +724,6 @@ def kfold_test_classifiers_with_optimization(df, classes, classifiers, clf_optio
         log.info("\n-----\nBegin {}\n-----\n".format(name))
         
         kf_iteration = 0
-        #if not n_repeats % 2:
-            #figure = plt.figure(figsize=(2 * 20.0, 5.0 * int(n_repeats/2.0)))
-            #plt_rows = int(n_repeats/2.0)
-        #else:
-            #figure = plt.figure(figsize=(2 * 20.0, 5.0 * int(n_repeats/2.0)+1))
-            #plt_rows = int(n_repeats/2.0)+1
         scores = []
         confusion_matrices = []
         roc_aucs = []
