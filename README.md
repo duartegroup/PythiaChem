@@ -12,9 +12,9 @@ A modular toolkit, implemented in Python and organized in Jupyter Notebooks. It 
 
 ## Modules:
 - classification metrics: calculation of confusion matrix, accuracy, g-mean, precision, recall, generalized f, MCC, AUC
-- fingerprints: generation of Morgan, rdkit, atom pair, torsion fingerprints and MACCS keys with rd
-- molecules and images: SMILES to molecules and images with rdkit
-- plot sklearn: plot of parity plots, ROC curves, confusion matrix with matplotlib
+- fingerprints generation: generation of Morgan, rdkit, atom pair, torsion fingerprints and MACCS keys with rd
+- molecules and structures: SMILES to molecules and images with rdkit
+- plots: plot of parity plots, ROC curves, confusion matrix with matplotlib
 - scaling: z, min-max, logarithmic scaling
 - workflow functions: correlation tests, training for regression and classification, ensemble learning with sklearn
 
