@@ -53,7 +53,7 @@ from sklearn.metrics import mean_absolute_error
 from sklearn.metrics import mean_squared_error
 from sklearn.metrics import r2_score
 from sklearn.preprocessing import OneHotEncoder, StandardScaler, MinMaxScaler
-# scikit-imbalenced learn
+# scikit-imbalanced learn
 from imblearn.over_sampling import SMOTE, SMOTENC, SMOTEN
 from imblearn.metrics import classification_report_imbalanced, sensitivity_specificity_support
 
@@ -276,7 +276,7 @@ def test_imbalenced_classifiers_with_optimization(df, classes, classifiers, clf_
                                                   class_labels=(0,1), no_train_output=False, test_set_size=0.2, smiles=None, names=None,
                                                   random_seed=1057091):
     """
-    function to run classification test over classifiers using imbalenced resampling
+    function to run classification test over classifiers using imbalanced resampling
     inspired from https://scikit-learn.org/stable/auto_examples/classification/plot_classifier_comparison.html
     :param df: dataframe - data frame of features
     :param classes: iterable - list of classes/labels
@@ -358,8 +358,8 @@ def test_imbalenced_classifiers_with_optimization(df, classes, classifiers, clf_
         log.info("Confusion matrix ({}):\n{}\n".format(name, c_matix))
         log.info("\nscore ({}): {}".format(name, clf_score))
         log.info("{}".format(classification_report(ytest, predicted_clf)))
-        log.info("Imbalence reports:")
-        log.info("Imbalence classification report:\n{}".format(classification_report_imbalanced(ytest, predicted_clf)))
+        log.info("Imbalance reports:")
+        log.info("Imbalance classification report:\n{}".format(classification_report_imbalanced(ytest, predicted_clf)))
         sensitvity, specificity, support = sensitivity_specificity_support(ytest, predicted_clf)
         log.info("{} {} {}".format(sensitvity, specificity, support))
         log.info("Predicted | Label\n------------------")
@@ -679,7 +679,7 @@ def kfold_test_classifiers_with_optimization(df, classes, classifiers, clf_optio
                                                         class_labels=(0,1), no_train_output=False, test_set_size=0.2, smiles=None, names=None,
                                                         random_seed=107901, overwrite=False):
     """
-    function to run classification test over classifiers using imbalenced resampling
+    function to run classification test over classifiers using imbalanced resampling
     inspired from https://scikit-learn.org/stable/auto_examples/classification/plot_classifier_comparison.html
     :param df: dataframe - data frame of features and identifers (smiles and/or names)
     :param classes: iterable - list of classes/labels
@@ -817,8 +817,8 @@ def kfold_test_classifiers_with_optimization(df, classes, classifiers, clf_optio
 
             list_score.append(clf_score)
         
-            log.info("\tImbalence reports:")
-            log.info("\tImbalence classification report:\n{}".format(classification_report_imbalanced(ytest, predicted_clf)))
+            log.info("\tImbalance reports:")
+            log.info("\tImbalance classification report:\n{}".format(classification_report_imbalanced(ytest, predicted_clf)))
             output_dict = classification_report_imbalanced(ytest, predicted_clf, output_dict=True)
             
             ## Plot the roc curves
@@ -911,7 +911,7 @@ def kfold_test_classifiers_with_optimization_weights(df, classes, classifiers, c
                                                         class_labels=(0,1), no_train_output=False, test_set_size=0.2, smiles=None, names=None,
                                                         random_seed=107901, overwrite=False):
     """
-    function to run classification test over classifiers using imbalenced resampling
+    function to run classification test over classifiers using imbalanced resampling
     inspired from https://scikit-learn.org/stable/auto_examples/classification/plot_classifier_comparison.html
     :param df: dataframe - data frame of features and identifers (smiles and/or names)
     :param classes: iterable - list of classes/labels
@@ -1050,8 +1050,8 @@ def kfold_test_classifiers_with_optimization_weights(df, classes, classifiers, c
 
             list_score.append(clf_score)
         
-            log.info("\tImbalence reports:")
-            log.info("\tImbalence classification report:\n{}".format(classification_report_imbalanced(ytest, predicted_clf)))
+            log.info("\tImbalance reports:")
+            log.info("\tImbalance classification report:\n{}".format(classification_report_imbalanced(ytest, predicted_clf)))
             output_dict = classification_report_imbalanced(ytest, predicted_clf, output_dict=True)
             
             ## Plot the roc curves
@@ -1145,7 +1145,7 @@ def test_classifiers_with_optimization(df, test_df, classes, testclasses, classi
                                        n_repeats=20,random_seed=107901, clf_names=None,no_train_output=False,
                                        class_labels=(0, 1)):
     """
-    function to run classification test over classifiers using imbalenced resampling
+    function to run classification test over classifiers using imbalanced resampling
     inspired from https://scikit-learn.org/stable/auto_examples/classification/plot_classifier_comparison.html
     :param df: dataframe - data frame of features and identifers (smiles and/or names)
     :param classes: iterable - list of classes/labels
@@ -1268,9 +1268,9 @@ def test_classifiers_with_optimization(df, test_df, classes, testclasses, classi
 
         list_score.append(clf_score)
 
-        log.info("\tImbalence reports:")
+        log.info("\tImbalance reports:")
         log.info(
-            "\tImbalence classification report:\n{}".format(classification_report_imbalanced(ytest, predicted_clf)))
+            "\tImbalance classification report:\n{}".format(classification_report_imbalanced(ytest, predicted_clf)))
         output_dict = classification_report_imbalanced(ytest, predicted_clf, output_dict=True)
 
         ## Plot the roc curves
