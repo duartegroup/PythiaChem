@@ -32,7 +32,7 @@ try:
 except ModuleNotFoundError:
     print("Scikit plot not avaliable")
 
-from . import plotting_sklearn as pltsk
+from . import plots as pltsk
 
 # matplotlib
 import matplotlib.pyplot as plt
