@@ -903,8 +903,7 @@ def kfold_test_classifiers_with_optimization(df, classes, classifiers, clf_optio
     log_df["score"] = pd.Series(list_score)
 
     log_df["c_matrix"] = pd.Series(list_c_matrix)
-    
-    # log_df.to_csv("logs2.csv")
+
 
 
 def kfold_test_classifiers_with_optimization_weights(df, classes, classifiers, clf_options, scale=True, cv=5, n_repeats=20, clf_names=None,class_weight=None,
@@ -1136,8 +1135,6 @@ def kfold_test_classifiers_with_optimization_weights(df, classes, classifiers, c
     log_df["score"] = pd.Series(list_score)
 
     log_df["c_matrix"] = pd.Series(list_c_matrix)
-    
-    # log_df.to_csv("logs2.csv")
 
 
 
