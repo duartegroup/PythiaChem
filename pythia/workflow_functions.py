@@ -569,7 +569,7 @@ def split_test_regressors_with_optimization(df, targets, test_df, test_targets, 
         plt.xlabel('Experimental')
         plt.legend(loc='lower right')
         plt.title(name.replace("_", " "))
-        plt.plot([-4.2, 2.2], [-4.2, 2.2], "k:")
+        plt.plot([-0.5, 11], [-1, 11], "k:")
         plt.savefig('{}/{}.png'.format(name, name), dpi=300)
         plt.show()
 
@@ -1371,9 +1371,9 @@ def metrics_for_regression(directories=('LassoCV', 'KNeighborsRegressor', 'Decis
 
         fig, ax = plt.subplots(figsize=(6, 6), dpi=300)
         ax.scatter(data['known'], data['prediction'], s=60, alpha=0.6, edgecolors="k", color='darkblue')
-        ax.set_ylabel('Predicted $log(EC_{50})$')
-        ax.set_xlabel('Experimental $log(EC_{50})$')
-        ax.plot([-4, 2], [-4, 2], "k:")
+        ax.set_ylabel('Predicted Δ∆$G^{‡}$ (kJ/mol)')
+        ax.set_xlabel('Experimental Δ∆$G^{‡}$ (kJ/mol)')
+        plt.plot([-0.5, 11], [-1, 11], "k:")
         ax.set_title(titlename)
 
         # add metrics to plot
