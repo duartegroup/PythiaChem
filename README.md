@@ -35,8 +35,8 @@ Use the .csv files to run the Notebooks and use the comments to assist you.
 ## Installation
 To use Pythia, you need to install several third-party softwares including rdkit, sklearn, mordred, etc.
 ```Bash
-conda create -n pythia
-conda activate pythia
+conda create -n pythiachem
+conda activate pythiachem
 conda install -c rdkit rdkit
 pip install -U imbalanced-learn
 pip install -U scikit-learn
@@ -49,7 +49,7 @@ pip install notebook
 To make environment available in jupyter notebook
 ```Bash
 conda install -c anaconda ipykernel
-python -m ipykernel install --user --name=pythia
+python -m ipykernel install --user --name=pythiachem
 ```
 
 ### Installation by pip
