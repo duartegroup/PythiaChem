@@ -4,21 +4,21 @@ channels:
   - conda-forge
 
 dependencies:
-  - python>=3.11.5
-  - pip>=20.0.2
+  - python>=3.9.13
+  - pip>=22.2.2
   - pip:
-    - imbalanced-learn==0.11.0
-    - matplotlib==3.8.2
-    - matplotlib-inline==0.1.6
-    - matplotlib-venn==0.11.9
-    - mlxtend==0.23.1
+    - imbalanced-learn==0.9.1
+    - matplotlib==3.3.2
+    - matplotlib-inline==0.1.2
+    - matplotlib-venn==0.11.7
+    - mlxtend==0.20.0
     - mordred==1.2.0
     - numpy==1.23.3
     - pandas==1.4.4
-    - py3dmol==2.0.4
-    - rdkit==2023.9.4
-    - scikit-learn==1.4.0
+    - py3dmol==1.8.1
+    - rdkit==2022.09.1
+    - scikit-learn==0.24.2
     - scikit-plot==0.3.7
-    - scipy==1.11.4
-    - seaborn==0.13.1
-    - tqdm==4.66.1
+    - scipy==1.9.2
+    - seaborn==0.11.1
+    - tqdm==4.64.1
