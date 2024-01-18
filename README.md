@@ -38,6 +38,8 @@ From environment.yml file:
 git clone https://github.com/duartegroup/PythiaChem.git
 cd PythiaChem
 conda env create -f environment.yml
+conda install -c anaconda ipykernel -y
+python -m ipykernel install --user --name=pythiachem
 conda activate pythiachem
 pip install -e .
 ```
@@ -51,9 +53,6 @@ pip install rdkit 'mordred[full]' mlxtend imbalanced-learn scikit-learn scikit-p
 git clone https://github.com/duartegroup/PythiaChem.git
 cd PythiaChem
 pip install -e .
-```
-If you want to make environment available in jupyter notebook
-```Bash
 conda install -c anaconda ipykernel -y
 python -m ipykernel install --user --name=pythiachem
 ```
