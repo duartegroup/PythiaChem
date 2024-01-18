@@ -38,9 +38,11 @@ From environment.yml file:
 git clone https://github.com/duartegroup/PythiaChem.git
 cd PythiaChem
 conda env create -f environment.yml
+conda activate pythiachem
+
 conda install -c anaconda ipykernel -y
 python -m ipykernel install --user --name=pythiachem
-conda activate pythiachem
+
 pip install -e .
 ```
 
