@@ -13,7 +13,6 @@ python -m ipykernel install --user --name=pythiachem
 pip install -e .
 ```
 
---------
 If installation with environment.yml fails, you can install manually with the following steps:
 ```Bash
 conda create -n pythiachem -y
