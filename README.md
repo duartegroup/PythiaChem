@@ -1,16 +1,16 @@
 # PythiaCHEM (PYthon Toolkit for macHIne leArning in CHEMistry)
 A modular toolkit, implemented in Python and organized in Jupyter Notebooks. It employs fingerprints Mordred descriptors and precalculated QM descriptors as input features for shallow learners and ensemble models for regression and classification tasks. 
 
-# Supported functionality
-## Tasks:
+## Supported functionality
+### Tasks:
 - Classification
 - Regression
 
-## Data types
+### Data types
 - SMILES strings
 - Precalculated descriptors
 
-## Modules:
+### Modules:
 - classification metrics: calculation of confusion matrix, accuracy, g-mean, precision, recall, generalized f, MCC, AUC
 - fingerprints generation: generation of Morgan, rdkit, atom pair, torsion fingerprints and MACCS keys with rd
 - molecules and structures: SMILES to molecules and images with rdkit
@@ -20,7 +20,7 @@ A modular toolkit, implemented in Python and organized in Jupyter Notebooks. It 
 
 We are working on populating this package with more models and other building blocks.
 
-## Notebooks:
+### Notebooks:
 - data analysis: data exploration, visualization, scaling
 - regression-fingerprints: regression with fingerprints, data set split, ensemble models
 - regression-Mordred: regression with Mordred, feature elimination techniques, data set split
@@ -32,7 +32,7 @@ We are working on populating this package with more models and other building bl
 Please mix and match Notebook cells and Modules. The world is your oyster, the sky is the limit.
 Use the .csv files to run the Notebooks and use the comments to assist you.
 
-# Installation
+## Installation
 From environment.yml file:
 ```Bash
 git clone https://github.com/duartegroup/PythiaChem.git
