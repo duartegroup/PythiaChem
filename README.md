@@ -1,30 +1,6 @@
 # PythiaCHEM (PYthon Toolkit for macHIne leArning in CHEMistry)
 A modular toolkit, implemented in Python and organized in Jupyter Notebooks. It employs fingerprints Mordred descriptors and precalculated QM descriptors as input features for shallow learners and ensemble models for regression and classification tasks. 
 
-# Installation
-From environment.yml file:
-```Bash
-git clone https://github.com/duartegroup/PythiaChem.git
-cd PythiaChem
-conda env create -f environment.yml
-conda activate pythiachem
-conda install -c anaconda ipykernel -y
-python -m ipykernel install --user --name=pythiachem
-pip install -e .
-```
-
-If installation with environment.yml fails, you can install manually with the following steps:
-```Bash
-conda create -n pythiachem -y
-conda activate pythiachem
-pip install rdkit 'mordred[full]' mlxtend imbalanced-learn scikit-learn scikit-plot seaborn notebook matplotlib matplotlib_venn
-git clone https://github.com/duartegroup/PythiaChem.git
-cd PythiaChem
-pip install -e .
-conda install -c anaconda ipykernel -y
-python -m ipykernel install --user --name=pythiachem
-```
-
 # Supported functionality
 ## Tasks:
 - Classification
@@ -56,3 +32,26 @@ We are working on populating this package with more models and other building bl
 Please mix and match Notebook cells and Modules. The world is your oyster, the sky is the limit.
 Use the .csv files to run the Notebooks and use the comments to assist you.
 
+# Installation
+From environment.yml file:
+```Bash
+git clone https://github.com/duartegroup/PythiaChem.git
+cd PythiaChem
+conda env create -f environment.yml
+conda activate pythiachem
+conda install -c anaconda ipykernel -y
+python -m ipykernel install --user --name=pythiachem
+pip install -e .
+```
+
+If installation with environment.yml fails, you can install manually with the following steps:
+```Bash
+conda create -n pythiachem -y
+conda activate pythiachem
+pip install rdkit 'mordred[full]' mlxtend imbalanced-learn scikit-learn scikit-plot seaborn notebook matplotlib matplotlib_venn
+git clone https://github.com/duartegroup/PythiaChem.git
+cd PythiaChem
+pip install -e .
+conda install -c anaconda ipykernel -y
+python -m ipykernel install --user --name=pythiachem
+```
