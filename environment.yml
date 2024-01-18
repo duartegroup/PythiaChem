@@ -15,7 +15,6 @@ dependencies:
     - mordred==1.2.0
     - numpy==1.26.3
     - pandas==2.1.4
-    - pip==23.3
     - py3dmol==2.0.4
     - rdkit==2023.9.4
     - scikit-learn==1.4.0
