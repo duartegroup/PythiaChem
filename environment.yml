@@ -14,7 +14,7 @@ dependencies:
     - mlxtend==0.23.1
     - mordred==1.2.0
     - numpy==1.23.3
-    - pandas==2.1.4
+    - pandas==1.4.4
     - py3dmol==2.0.4
     - rdkit==2023.9.4
     - scikit-learn==1.4.0
