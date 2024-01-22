@@ -322,14 +322,17 @@ def grid_search_regressor_parameters(rgs, Xtrain, ytrain, rgs_options, rgs_names
     log = logging.getLogger(__name__)
 
     # Grid search model optimizer
-    parameters = rgs_options[rgs_names[iteration]]
-    log.debug("\tname: {} parameters: {}".format(name, parameters))
+    parameters = rgs_options
+    #parameters = rgs_options[rgs_names[iteration]]
+    log.info("\tname: {} parameters: {}".format(name, parameters))
 
     optparam_search = GridSearchCV(rgs, parameters, cv=cv, error_score=np.nan, scoring=scoring, refit=scoring[0],
                                    return_train_score=True)
     log.debug("\tCV xtrain: {}".format(Xtrain))
 
-    optparam_search.fit(Xtrain, ytrain.values.ravel())
+    optparam_search.fit(Xtrain, ytrain)
+
+    #optparam_search.fit(Xtrain, ytrain.values.ravel())
     opt_parameters = optparam_search.best_params_
 
     if no_train_output is False:
@@ -419,7 +422,7 @@ def kfold_test_regressor_with_optimization(df, targets, regressors, rgs_options,
             # test_i = np.array(list(set(df.index) - set(train_indx)))
 
             # Grid search model optimizer
-            opt_param = grid_search_regressor_parameters(regs, Xtrain, ytrain, rgs_options, rgs_names, iteration,
+            opt_param = grid_search_regressor_parameters(regs, Xtrain, ytrain, rgs_options[name], rgs_names, iteration,
                                                              no_train_output, cv=cv, name=name)
 
             list_opt_param.append(opt_param)
@@ -429,7 +432,8 @@ def kfold_test_regressor_with_optimization(df, targets, regressors, rgs_options,
             reg.set_params(**opt_param)
             log.info("\n\t----- Predicting using: {} -----".format(name))
             log.info("\tXtrain: {}\n\tXtest: {}\n\tytrain: {}\n\tytest: {}".format(Xtrain, Xtest, ytrain, ytest))
-            reg.fit(Xtrain, ytrain.values.ravel())
+            reg.fit(Xtrain, ytrain)
+            #reg.fit(Xtrain, ytrain.values.ravel())
 
             # Evaluate the model
             # evaluate the model on multiple metric score as list for averaging
@@ -466,7 +470,7 @@ def split_test_regressors_with_optimization(df, targets, test_df, test_targets, 
     log = logging.getLogger(__name__)
     all_test_metrics, all_train_metrics = [], []
     iteration = 0
-
+    p=[]
     if rgs_names is None:
         rgs_names = [i for i in range(0, len(regressors))]
 
@@ -491,7 +495,7 @@ def split_test_regressors_with_optimization(df, targets, test_df, test_targets, 
         #         log.info("Train Y\n{}".format(ytrain))
 
         #         Find optimal parameters
-        opt_param = grid_search_regressor_parameters(reg, Xtrain, ytrain, rgs_options, rgs_names, iteration,
+        opt_param = grid_search_regressor_parameters(reg, Xtrain, ytrain, rgs_options[name], rgs_names, iteration,
                                                      no_train_output, cv=cv, name=name)
 
         # Fit model using optimized parameters
@@ -548,7 +552,7 @@ def split_test_regressors_with_optimization(df, targets, test_df, test_targets, 
         # Set the style globally
         # Alternatives include bmh, fivethirtyeight, ggplot,
         # dark_background, seaborn-deep, etc
-        plt.style.use('seaborn-white')
+        plt.style.use('default')
 
         plt.rcParams['font.family'] = 'serif'
         plt.rcParams['font.serif'] = 'Ubuntu'
@@ -562,16 +566,22 @@ def split_test_regressors_with_optimization(df, targets, test_df, test_targets, 
         plt.rcParams['legend.fontsize'] = 20
         plt.rcParams['figure.titlesize'] = 24
 
-        plt.figure(figsize=(6, 6), dpi=300)
-        plt.scatter(targets, train_predictions, s=60, edgecolors="k", color='darkblue', label="Train")
-        plt.scatter(test_targets, test_predictions, s=60, edgecolors="k", color='lightgrey', label="Test")
-        plt.ylabel('Predicted')
-        plt.xlabel('Experimental')
+        plt.figure(figsize=(9, 9), dpi=300)
+        plt.scatter(targets, train_predictions, s=60, alpha=0.6,edgecolors="k", color='silver', label="Train")
+        plt.scatter(test_targets, test_predictions, s=60,alpha=0.6, edgecolors="k", color='blue', label="Test")
+        plt.ylabel('Predicted Δ∆$G^{‡}$ (kJ/mol)')
+        plt.xlabel('Experimental Δ∆$G^{‡}$ (kJ/mol)')
         plt.legend(loc='lower right')
         plt.title(name.replace("_", " "))
-        plt.plot([-0.5, 11], [-1, 11], "k:")
+        plt.plot([-0.05, 11], [-0.05, 11], "k:")
         plt.savefig('{}/{}.png'.format(name, name), dpi=300)
         plt.show()
+
+        for i, j in zip(ytest, test_predictions):
+            p.append([i, j])
+        pred = pd.DataFrame(p, columns=['actual', 'predicted'])
+        pred.to_csv("{}/predictions.csv".format(name), index=False)
+        del p[:]
 
     all_train_metrics = pd.DataFrame(all_train_metrics)
     all_train_metrics.to_csv('train_metrics.csv')
@@ -1344,12 +1354,13 @@ def metrics_for_regression(directories=('LassoCV', 'KNeighborsRegressor', 'Decis
         f.write("\n")
         f.close()
 
+
         plt.rcParams.update()
         #ref: http://www.futurile.net/2016/02/27/matplotlib-beautiful-plots-with-style/
         # Set the style globally
         # Alternatives include bmh, fivethirtyeight, ggplot,
         # dark_background, seaborn-deep, etc
-        plt.style.use('seaborn-white')
+        plt.style.use('default')
 
         plt.rcParams['font.family'] = 'serif'
         plt.rcParams['font.serif'] = 'Ubuntu'
@@ -1369,11 +1380,11 @@ def metrics_for_regression(directories=('LassoCV', 'KNeighborsRegressor', 'Decis
             fig_title = directory
         titlename = fig_title.replace("_", "")
 
-        fig, ax = plt.subplots(figsize=(6, 6), dpi=300)
-        ax.scatter(data['known'], data['prediction'], s=60, alpha=0.6, edgecolors="k", color='darkblue')
+        fig, ax = plt.subplots(figsize=(9, 9), dpi=300)
+        ax.scatter(data['known'], data['prediction'], s=60, alpha=0.6, edgecolors="k", color='silver')
         ax.set_ylabel('Predicted Δ∆$G^{‡}$ (kJ/mol)')
         ax.set_xlabel('Experimental Δ∆$G^{‡}$ (kJ/mol)')
-        plt.plot([-0.5, 11], [-1, 11], "k:")
+        plt.plot([-0.05, 11], [-0.05, 11], "k:")
         ax.set_title(titlename)
 
         # add metrics to plot
@@ -1681,7 +1692,7 @@ def feature_categorization(features_df, feature_types="some_categorical", catego
                 ('categorical', categorical_transformer, categorical_features)])
 
         features_df = preprocessor.fit_transform(features_df)
-        print(features_df)
+        # print(features_df)
         feature_names = get_feature_names_from_column_transformers(preprocessor)
         categorical_indxs = [i for i in range(len(numeric_features), len(feature_names))]
         log.info(feature_names)
@@ -1705,3 +1716,44 @@ def feature_categorization(features_df, feature_types="some_categorical", catego
         log.info("No scaling")
 
     return features_df
+
+def ensemble(csv_files):
+    log = logging.getLogger(__name__)
+    predicted_values = []
+
+    ensemble_metrics = {}
+    # Read predicted values from each CSV file
+    for file in csv_files:
+        log.info("\n\t Reading:{} ".format(file))
+        data = pd.read_csv(file)
+        predicted_values.append(data['predicted'])
+
+    log.info("\n\t Gathered all predictions ")
+    # Calculate mean value of predicted values
+    mean_predicted = np.mean(predicted_values, axis=0)
+
+    # Get actual values from the first CSV file
+    actual = pd.read_csv(csv_files[0])['actual']
+    log.info("\n\tCalculating metrics")
+    # Calculate regression metrics
+    mae = mean_absolute_error(actual, mean_predicted)
+    mse = mean_squared_error(actual, mean_predicted)
+    rmse = np.sqrt(mse)
+    r2 = r2_score(actual, mean_predicted)
+
+    ensemble_metrics['mae'] = mae
+    ensemble_metrics['mse'] = mse
+    ensemble_metrics['rmse'] = rmse
+    ensemble_metrics['r2'] = r2
+
+    plt.figure(figsize=(6, 4))
+    plt.scatter(actual, mean_predicted, color='blue', marker='x')
+    plt.ylabel('Predicted Δ∆$G^{‡}$ (kJ/mol)', fontsize=13)
+    plt.xlabel('Experimental Δ∆$G^{‡}$ (kJ/mol)', fontsize=13)
+    plt.plot([-0.05, 11], [-0.05, 11], "k:")
+
+    plt.xticks(np.arange(0, 12, step=2))
+    plt.yticks(np.arange(0, 12, step=2))
+
+
+    return ensemble_metrics
