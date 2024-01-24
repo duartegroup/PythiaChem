@@ -1672,36 +1672,80 @@ def feature_categorization(features_df, feature_types="some_categorical", catego
         log.info(pd.DataFrame(features_df, columns=feature_columns))
         features_df = pd.DataFrame(features_df, columns=feature_columns)
 
-    # Some categorical - Need to provide the indexes
+    # ...
+
+    # ...
+
     elif feature_types == "some_categorical":
         numeric_features = [feature_columns[i] for i in range(len(feature_columns)) if i not in categorical_indxs]
         numerical_transformer = MinMaxScaler()
         categorical_features = [feature_columns[i] for i in range(len(feature_columns)) if i in categorical_indxs]
         categorical_transformer = OneHotEncoder(handle_unknown='ignore')
         if any(ent in categorical_features for ent in numeric_features):
-            log.warning("WARNING - numeric and categorical feature specififed overlap")
+            log.warning("WARNING - numeric and categorical features specified overlap")
             log.info(numeric_features)
             log.info(categorical_features)
         else:
             log.info("Numerical features:\n{} {}".format(numeric_features, len(numeric_features)))
             log.info("Categorical features:\n{} {}".format(categorical_features, len(categorical_indxs)))
-        
-        preprocessor = ColumnTransformer(
-            transformers=[
-                ("numerical", numerical_transformer, numeric_features),
-                ('categorical', categorical_transformer, categorical_features)])
 
-        features_df = preprocessor.fit_transform(features_df)
-        # print(features_df)
-        feature_names = get_feature_names_from_column_transformers(preprocessor)
-        categorical_indxs = [i for i in range(len(numeric_features), len(feature_names))]
-        log.info(feature_names)
+        # Fit the transformers separately
+        numerical_transformer.fit(features_df[numeric_features])
+        categorical_transformer.fit(features_df[categorical_features])
 
-        log.info(pd.DataFrame(features_df, columns=feature_names))
-        features_df = pd.DataFrame(features_df, columns=feature_names)
+        # Transform the data
+        numerical_features_transformed = numerical_transformer.transform(features_df[numeric_features])
+        categorical_features_transformed = categorical_transformer.transform(features_df[categorical_features])
+
+        # Extract feature names after transformation
+        numerical_feature_names = numerical_transformer.get_feature_names_out(numeric_features)
+        categorical_feature_names = categorical_transformer.get_feature_names_out(categorical_features)
+
+        # Convert transformed features to DataFrames
+        numerical_df_transformed = pd.DataFrame(numerical_features_transformed, columns=numerical_feature_names)
+        categorical_df_transformed = pd.DataFrame(categorical_features_transformed.toarray(),
+                                                  columns=categorical_feature_names)
+        # Concatenate the transformed features
+        features_df = pd.concat([numerical_df_transformed, categorical_df_transformed], axis=1)
+
+        log.info(features_df.columns)
+
+        log.info(pd.DataFrame(features_df, columns=features_df.columns))
         log.info("categorical indexes {}".format(categorical_indxs))
         log.info("Categorical features start on column name {} and end on {}".format(
             features_df.columns[categorical_indxs[0]], features_df.columns[categorical_indxs[-1]]))
+
+
+    # Some categorical - Need to provide the indexes
+    #elif feature_types == "some_categorical":
+        #  numeric_features = [feature_columns[i] for i in range(len(feature_columns)) if i not in categorical_indxs]
+        #  numerical_transformer = MinMaxScaler()
+        #  categorical_features = [feature_columns[i] for i in range(len(feature_columns)) if i in categorical_indxs]
+        #  categorical_transformer = OneHotEncoder(handle_unknown='ignore')
+        # if any(ent in categorical_features for ent in numeric_features):
+        #     log.warning("WARNING - numeric and categorical feature specififed overlap")
+        #   log.info(numeric_features)
+    #    log.info(categorical_features)
+        # else:
+        # log.info("Numerical features:\n{} {}".format(numeric_features, len(numeric_features)))
+        # log.info("Categorical features:\n{} {}".format(categorical_features, len(categorical_indxs)))
+        
+        #preprocessor = ColumnTransformer(
+        #  transformers=[
+        #     ("numerical", numerical_transformer, numeric_features),
+        #    ('categorical', categorical_transformer, categorical_features)])
+
+        #features_df = preprocessor.fit_transform(features_df)
+        # print(features_df)
+        #feature_names = get_feature_names_from_column_transformers(preprocessor)
+        #categorical_indxs = [i for i in range(len(numeric_features), len(feature_names))]
+        #log.info(feature_names)
+
+        #log.info(pd.DataFrame(features_df, columns=feature_names))
+        # features_df = pd.DataFrame(features_df, columns=feature_names)
+        # log.info("categorical indexes {}".format(categorical_indxs))
+        # log.info("Categorical features start on column name {} and end on {}".format(
+    #  features_df.columns[categorical_indxs[0]], features_df.columns[categorical_indxs[-1]]))
 
     # All categorical
     elif feature_types == "categorical":
@@ -1715,7 +1759,7 @@ def feature_categorization(features_df, feature_types="some_categorical", catego
     else:
         log.info("No scaling")
 
-    return features_df
+    return features_df,categorical_indxs
 
 def ensemble(csv_files):
     log = logging.getLogger(__name__)
