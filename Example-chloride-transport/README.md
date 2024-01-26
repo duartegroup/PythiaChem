@@ -1,7 +1,13 @@
 # Example - chloride transport
 In this example, we investigate the chloride transport activity of synthetic anion transporters. These are small molecule ligands that can bind anions and transport them across membranes operating via a mobile carrier mechanism, with therapeutic potential in ion channel-related diseases. Here, we use classification to identify whether a transporter can be considered active or inactive based on its $log(EC_{50})$ value. 
 
-### Notebooks:
-- data analysis: dataset exploration and visualization
-- classification-Mordred: classification with Mordred, feature elimination and exploration, synthetic data, data set split
+# Notebooks:
+## Notebook: Dataset Analysis
+This notebook provides a comprehensive exploration of the dataset through various analytical and visualization techniques. The goal is to gain insights into target distribution, chemical diversity, and the potential influence of binding motifs on target and class distributions. 
 
+First, the necessary modules (scaling, fingerprints and molecules, and images) are imported. After this, the dataset is imported as a .csv file containing the SMILES entries for the molecules under study, along with any other information. The standard analysis comprises investigating the distribution of the target variable, assessing class imbalances, visualizing 2D chemical structures, and computing the Tanimoto similarity matrix to gauge structural diversity. Chemical space visualization is also supported, which uses techniques like PCA, t-SNE, and UMAP to gain insights into the underlying structure and relationships between the molecules in the dataset. It can help visualize molecular similarities and identify potential clusters or trends. This is especially useful when exploring the chemical space or assessing the diversity of a compound library.
+
+Furthermore, it introduces an advanced analysis section, optional for users, focusing on recognized binding motifs for anion transporters. This section covers substructure matching against binding motifs, exploring overlap between motif-specific datasets, and assessing Tanimoto similarity within substructure sets. Additionally, it delves into the target and class distributions of each substructure dataset, shedding light on potential patterns and imbalances. This comprehensive notebook combines standard exploratory analyses with optional advanced analyses that delve into substructure-specific insights. It enables users to gain a deep understanding of the dataset's properties and the potential impact of binding motifs on various aspects of the data.
+
+## Notebook: Classification-Mordred
+This notebook primarily revolves around the process of generating features using the Mordred calculator to create descriptors for molecules. We compute 1613 2D Mordred descriptors. After feature generation, data cleaning is performed to enhance data quality and relevance. Feature selection is conducted using correlation analysis. Spearman correlation coefficients are computed to identify descriptors that correlate with the target value. Custom features are added. To address class imbalance, we generate synthetic data using SMOTENC, considering both categorical and non-categorical data. Once the synthetic points data frame is constructed, the classification algorithms are trained, and model evaluation is performed. 
