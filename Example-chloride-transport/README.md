@@ -1,4 +1,4 @@
-# Example - predicting chloride transport activity of synthetic anion transporters
+# Example - chloride transport
 
 ### Tasks:
 - Classification
