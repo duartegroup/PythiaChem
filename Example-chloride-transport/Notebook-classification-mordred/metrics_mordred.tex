@@ -1,0 +1,17 @@
+\begin{table}[H]
+\centering
+\caption{Classifier metrics for balanced data for ddg with models built from mordred features. MCC is the Matthew’s correlation coefficent.}
+\label{tbl:mordred_features}
+\begin{tabular}{lrrrrrr}
+\toprule
+{} &  Accuracy &  Sensitivity &  Specificity &  MCC &  Precision &  G-mean \\
+\midrule
+nearest neighbors    &      0.73 &         0.76 &         0.68 & 0.44 &       0.76 &    0.72 \\
+gaussian process     &      0.91 &         0.84 &         1.00 & 0.83 &       1.00 &    0.92 \\
+decision tree        &      0.61 &         0.48 &         0.79 & 0.28 &       0.75 &    0.62 \\
+extratreesclassifier &      0.89 &         0.92 &         0.84 & 0.77 &       0.88 &    0.88 \\
+adaboost             &      0.57 &         0.96 &         0.05 & 0.03 &       0.57 &    0.22 \\
+logistic regression  &      0.75 &         0.72 &         0.79 & 0.50 &       0.82 &    0.75 \\
+\bottomrule
+\end{tabular}
+\end{table}
