@@ -544,7 +544,8 @@ def get_fingerprints_bit_importance(model_file, features_df, non_fingerprint_fea
             #df_feature_importance = df_feature_importance.append({"feature": i, "importance": 0}, ignore_index=True)
             #df = df_feature_importance.append({"feature": i, "importance": 0}, ignore_index=True)
             #print(i)
-            df_feature_importance = pd.concat([df_feature_importance, pd.DataFrame([{"feature": i, "importance": 0}])], ignore_index=True)
+            j = 'fp_' + str(i)
+            df_feature_importance = pd.concat([df_feature_importance, pd.DataFrame([{"feature": j, "importance": 0}])], ignore_index=True)
 
     df = df_feature_importance.sort_values(by=["feature"])
     print(len(df.feature))
@@ -594,7 +595,7 @@ def plot_fingerprints_bit_importance(smiles, df_feature_importance, radius=2, nB
     
     for i in range(n_mols):
         smi = smiles[i]
-        #print(smi)
+        print(smi)
         try: 
             mol = Chem.MolFromSmiles(smi)
 

@@ -62,6 +62,11 @@ def maccskeys_fingerprints(smiles):
     fps = [MACCSkeys.GenMACCSKeys(mol) for mol in mols]
     A = np.mat(fps)
     df = pd.DataFrame(data=A)
+
+    # add 'fp_' to the column names because interger column names cause problems in pandas
+    df.columns = ['fp_' + str(i) for i in df.columns]
+
+
     return fps,df
 
 def atom_pair_fingerprints(smiles, nBits = 1024, bit_vec=False, return_only_non_zero=False, log_explanation=False):
@@ -149,6 +154,9 @@ def morgan_fingerprints(smiles, radius=2, n_bits=1024, bit_vec=True, feature_inv
 
     A = np.mat(fps)
     df = pd.DataFrame(data=A)
+
+    # add 'fp_' to the column names because interger column names cause problems in pandas
+    df.columns = ['fp_' + str(i) for i in df.columns]
 
     return fps,df
 

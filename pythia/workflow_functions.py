@@ -553,10 +553,6 @@ def split_test_regressors_with_optimization(df, targets, test_df, test_targets, 
         # Alternatives include bmh, fivethirtyeight, ggplot,
         # dark_background, seaborn-deep, etc
         plt.style.use('default')
-
-        plt.rcParams['font.family'] = 'serif'
-        plt.rcParams['font.serif'] = 'Ubuntu'
-        plt.rcParams['font.monospace'] = 'Ubuntu Mono'
         plt.rcParams['font.size'] = 20
         plt.rcParams['axes.labelsize'] = 20
         plt.rcParams['axes.labelweight'] = 'bold'
@@ -569,8 +565,8 @@ def split_test_regressors_with_optimization(df, targets, test_df, test_targets, 
         plt.figure(figsize=(9, 9), dpi=300)
         plt.scatter(targets, train_predictions, s=60, alpha=0.6,edgecolors="k", color='silver', label="Train")
         plt.scatter(test_targets, test_predictions, s=60,alpha=0.6, edgecolors="k", color='blue', label="Test")
-        plt.ylabel('Predicted Δ∆$G^{‡}$ (kJ/mol)')
-        plt.xlabel('Experimental Δ∆$G^{‡}$ (kJ/mol)')
+        plt.ylabel('Predicted')
+        plt.xlabel('Experimental')
         plt.legend(loc='lower right')
         plt.title(name.replace("_", " "))
         plt.plot([-0.05, 11], [-0.05, 11], "k:")
@@ -1361,10 +1357,6 @@ def metrics_for_regression(directories=('LassoCV', 'KNeighborsRegressor', 'Decis
         # Alternatives include bmh, fivethirtyeight, ggplot,
         # dark_background, seaborn-deep, etc
         plt.style.use('default')
-
-        plt.rcParams['font.family'] = 'serif'
-        plt.rcParams['font.serif'] = 'Ubuntu'
-        plt.rcParams['font.monospace'] = 'Ubuntu Mono'
         plt.rcParams['font.size'] = 20
         plt.rcParams['axes.labelsize'] = 20
         plt.rcParams['axes.labelweight'] = 'bold'
@@ -1382,8 +1374,8 @@ def metrics_for_regression(directories=('LassoCV', 'KNeighborsRegressor', 'Decis
 
         fig, ax = plt.subplots(figsize=(9, 9), dpi=300)
         ax.scatter(data['known'], data['prediction'], s=60, alpha=0.6, edgecolors="k", color='silver')
-        ax.set_ylabel('Predicted Δ∆$G^{‡}$ (kJ/mol)')
-        ax.set_xlabel('Experimental Δ∆$G^{‡}$ (kJ/mol)')
+        ax.set_ylabel('Predicted')
+        ax.set_xlabel('Experimental')
         plt.plot([-0.05, 11], [-0.05, 11], "k:")
         ax.set_title(titlename)
 
@@ -1792,8 +1784,8 @@ def ensemble(csv_files):
 
     plt.figure(figsize=(6, 4))
     plt.scatter(actual, mean_predicted, color='blue', marker='x')
-    plt.ylabel('Predicted Δ∆$G^{‡}$ (kJ/mol)', fontsize=13)
-    plt.xlabel('Experimental Δ∆$G^{‡}$ (kJ/mol)', fontsize=13)
+    plt.ylabel('Predicted', fontsize=13)
+    plt.xlabel('Experimental', fontsize=13)
     plt.plot([-0.05, 11], [-0.05, 11], "k:")
 
     plt.xticks(np.arange(0, 12, step=2))
