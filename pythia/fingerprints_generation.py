@@ -50,6 +50,7 @@ def rdkit_fingerprints(smiles):
     fps = [Chem.RDKFingerprint(mol) for mol in mols]
 
     return fps
+
 def maccskeys_fingerprints(smiles):
     """
     Function to get MACCS fingerprints
@@ -69,7 +70,7 @@ def maccskeys_fingerprints(smiles):
 
     return fps,df
 
-def atom_pair_fingerprints(smiles, nBits = 1024, bit_vec=False, return_only_non_zero=False, log_explanation=False):
+def atom_pair_fingerprints(smiles, nBits = 1024, bit_vec=True, return_only_non_zero=False, log_explanation=False):
     """
     Function to get atom pair fingerprints
     :param smiles: list - smiles representation of the molecules to make fingerprints of
@@ -96,9 +97,16 @@ def atom_pair_fingerprints(smiles, nBits = 1024, bit_vec=False, return_only_non_
         for inx, fp in enumerate(fps):
             log.info("Atom pair finger print number {}:\n\texplanation: {}".format(inx, Pairs.ExplainPairScore(fp)))
     
-    return fps
+    A = np.mat(fps)
+    df = pd.DataFrame(data=A)
 
-def torsion_fingerprints(smiles, nBits = 1024, bit_vec=False, return_only_non_zero=False, log_explanation=False):
+    # add 'fp_' to the column names because interger column names cause problems in pandas
+    df.columns = ['fp_' + str(i) for i in df.columns]
+
+    return fps,df
+
+
+def torsion_fingerprints(smiles, nBits = 1024, bit_vec=True, return_only_non_zero=False, log_explanation=False):
     """
     Function to get topological fingerprints
     :param smiles: list - smiles representation of the molecules to make fingerprints of
@@ -114,6 +122,7 @@ def torsion_fingerprints(smiles, nBits = 1024, bit_vec=False, return_only_non_ze
     
     if bit_vec is True:
         fps = [rdMolDescriptors.GetHashedTopologicalTorsionFingerprintAsBitVect(mol, nBits = nBits) for mol in mols]
+        
     else:
         fps = [rdMolDescriptors.GetTopologicalTorsionFingerprint(mol) for mol in mols]
     
@@ -124,7 +133,14 @@ def torsion_fingerprints(smiles, nBits = 1024, bit_vec=False, return_only_non_ze
         for inx, fp in enumerate(fps):
             log.info("Topological torsion finger print number {}:\n\texplanation: {}".format(inx, Pairs.ExplainPairScore(fp)))
     
-    return fps
+    A = np.mat(fps)
+    df = pd.DataFrame(data=A)
+
+    # add 'fp_' to the column names because interger column names cause problems in pandas
+    df.columns = ['fp_' + str(i) for i in df.columns]
+
+    return fps,df
+
 
 def morgan_fingerprints(smiles, radius=2, n_bits=1024, bit_vec=True, feature_invarients=False, return_only_non_zero=True, log_explanation=False):
     """
