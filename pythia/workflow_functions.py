@@ -1168,28 +1168,6 @@ def test_classifiers_with_optimization(df, test_df, classes, testclasses, classi
             "\tImbalance classification report:\n{}".format(classification_report_imbalanced(ytest, predicted_clf)))
         output_dict = classification_report_imbalanced(ytest, predicted_clf, output_dict=True)
 
-        ## Plot the roc curves
-        #ax = plt.subplot(2, plt_rows, kf_iteration + 1)
-        #ax.plot(fpr, tpr, color="red",
-        #        lw=1.5, label="ROC curve (auc = {:.2f})".format(roc_auc))
-
-        #ax.plot(fpr, tpr, alpha=0.0, color="white", lw=1.5,
-        #        label="pre_class0 = {:.2f}\n".format(output_dict[0]['pre']) + "pre_class1 = {:.2f}".format(
-        #            output_dict[1]['pre']))
-        #ax.plot(fpr, tpr, alpha=0.0, color="white", lw=1.5,
-        #        label="f1_class0 = {:.2f}\n".format(output_dict[0]['f1']) + "f1_class1 = {:.2f}".format(
-        #            output_dict[1]['f1']))
-        #ax.plot(fpr, tpr, alpha=0.0, color="white", lw=1.5,
-        #        label="rec_class0 = {:.2f}\n".format(output_dict[0]['rec']) + "rec_class1 = {:.2f}".format(
-        #            output_dict[1]['rec']))
-
-        #ax.plot([0, 1], [0, 1], "k:")
-        #ax.set_xlim(xmin=0.0, xmax=1.01)
-        #ax.set_ylim(ymin=0.0, ymax=1.01)
-        #ax.set_xlabel('False Positive Rate')
-        #ax.set_ylabel('True Positive Rate')
-        #ax.legend(loc="lower right")
-
         list_report.append(classification_report_imbalanced(ytest, predicted_clf))
 
         sensitvity, specificity, support = sensitivity_specificity_support(ytest, predicted_clf)
@@ -1204,8 +1182,6 @@ def test_classifiers_with_optimization(df, test_df, classes, testclasses, classi
         pred = pd.DataFrame(pred)
         pred.T.to_csv("{}/{}.csv".format(name, kf_iteration))
         kf_iteration = kf_iteration + 1
-
-        # Plot and assess classifier over all folds
 
         # NOTE - rows are scores columns are classes
         average_scores = np.mean(score_list, axis=0)
@@ -1236,11 +1212,6 @@ def test_classifiers_with_optimization(df, test_df, classes, testclasses, classi
             std_scores[3][1])
         score_str3 = "Average ROC AUCs: {:.2f} +/- {:.2f}".format(average_roc_auc, std_roc_auc)
         score_text = "{}\n{}\n{}".format(score_str1, score_str2, score_str3)
-        plt.annotate(score_text, xy=(0.5, 0), xytext=(0, 0), xycoords="figure fraction", textcoords='offset points',
-                     size=12, ha='center', va='bottom')
-        #figure.tight_layout()
-        #plt.savefig("{0}/{0}_roc_curves.png".format(name))
-        #plt.show()
 
         iteration = iteration + 1
     log_df["opt_param"] = pd.Series(list_opt_param)
