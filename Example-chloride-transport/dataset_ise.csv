@@ -2,7 +2,7 @@
 (transporter)","Binding mode
 (anion)","Stochiometry
 (# of anion 
-per transporter)",NMR Solvent,Ka ( M-1),Assay,Lipid,Measured by,Cl source inside,Cl conc (mM),Assay pH,Time between transporter added and lysis (s),EC50(mol%),target,Hill parameter n,paperID,Year,Ref
+per transporter)",NMR Solvent,Ka ( M-1),Assay,Lipid,Measured by,Cl source inside,Cl conc (mM),Assay pH,Time between transporter added and lysis (s),EC50(mol%)_raw,EC50(mol%)_target,Hill parameter n,paperID,Year,Ref
 1,S=C(NCCCCCC)NC1=CC=C(Br)C=C1,Cl,1,1,1,DMSO,18.62,Cl-/NO3-,POPC,ISE,NaCl,489,7.2,270,0.93,0.93,,1,2013,Towards predictable transmembrane transport: QSAR analysis of anion binding and transport - Chemical Science (RSC Publishing)
 2,S=C(NCCCCCC)NC1=CC=C(C(F)(F)F)C=C1,Cl,1,1,1,DMSO,26.3,Cl-/NO3-,POPC,ISE,NaCl,489,7.2,270,0.44,0.44,1.65,1,2013,Towards predictable transmembrane transport: QSAR analysis of anion binding and transport - Chemical Science (RSC Publishing)
 3,S=C(NCCCCCC)NC1=CC=C(Cl)C=C1,Cl,1,1,1,DMSO,19.95,Cl-/NO3-,POPC,ISE,NaCl,489,7.2,270,1.02,1.02,1.57,1,2013,Towards predictable transmembrane transport: QSAR analysis of anion binding and transport - Chemical Science (RSC Publishing)

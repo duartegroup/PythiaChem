@@ -247,6 +247,32 @@ def mol_grid(smiles=None, mols=None, mol_row=3, subimage_size=(200, 200), labels
 
     return grid
 
+def draw_mols_grid(mols, molsPerRow=3, subImgSize=(300, 300)):
+    """
+    Function to draw a list of molecules in a grid. Ref: https://www.rdkit.org/docs/source/rdkit.Chem.Draw.rdMolDraw2D.html#rdkit.Chem.Draw.rdMolDraw2D.MolDraw2D
+    :param mols: list of molecules as RDKit objects
+    :param molsPerRow: int - number of molecules per row
+    :param subImgSize: tuple - size of the sub image
+    """
+
+    nRows = len(mols) // molsPerRow
+    if len(mols) % molsPerRow: nRows += 1
+    fullSize = (molsPerRow * subImgSize[0], nRows * subImgSize[1])
+    full_image = Image.new('RGBA', fullSize )
+    for ii, mol in enumerate(mols):
+        if mol.GetNumConformers() == 0:
+            AllChem.Compute2DCoords(mol)
+        column = ii % molsPerRow
+        row = ii // molsPerRow
+        offset = ( column*subImgSize[0], row * subImgSize[1] )
+        d2d = rdMolDraw2D.MolDraw2DCairo(subImgSize[0], subImgSize[1])
+        d2d.DrawMolecule(mol)
+        d2d.FinishDrawing()
+        sub = Image.open(BytesIO(d2d.GetDrawingText()))
+        full_image.paste(sub,box=offset)
+    return full_image
+
+
 def twod_mol_align(molecules, template_smarts=None, template_smiles=None):
     """
     Function to align 2D RDkit molecules.
