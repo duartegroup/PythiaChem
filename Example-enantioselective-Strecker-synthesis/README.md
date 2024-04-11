@@ -9,7 +9,7 @@ This notebook enables comprehensive exploration, visualization, and analysis of 
 This notebook focuses on binary classification scenarios using fingerprints. Various fingerprint options are available, including Morgan fingerprints, RDKit fingerprints, MACCS keys, atom pair fingerprints, and torsion fingerprints. It handles the removal of features represented as 0 across all fingerprint bits. When dealing with an imbalanced dataset, it is possible to generate synthetic data by upsampling the minority class using SMOTE.
 Model training is performed with several classifiers and model interpretation is done using Gini feature importance, permutation feature importance, and SHapley Additive exPlanations (SHAP) analysis, which assesses the relative importance of features on the predictions. 
 
-##Notebook 3: Classification-Mordred
+## Notebook 3: Classification-Mordred
 This notebook uses Mordred descriptors, which offer a set of features encompassing topological, geometric, and electronic properties to represent chemical structures. Mordred descriptors are easily calculated and highly interpretable, making them widely used in the field of cheminformatics. Feature selection is conducted using correlation analysis, which tests each feature individually for its correlation with the target property and with other features. Both the Pearson correlation and Spearman correlation can be used. Correlation matrices and pairwise plots can also be generated within the notebook. Features that fail specific statistical criteria are discarded, and SMOTE is used for balancing imbalanced datasets. The model training procedure and interpretation are the same as Notebook 2.
 
 
