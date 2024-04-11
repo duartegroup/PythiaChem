@@ -1,6 +1,7 @@
 # Example: Enantioselective Strecker synthesis
 
-Here, we use this example to fully desmontrate all notebooks available in PythiaCHEM:
+Here, we use this example to fully desmontrate all notebooks available in PythiaCHEM.
+
 
 ## Notebook 1: Data Analysis
 This notebook enables comprehensive exploration, visualization, and analysis of the data. It facilitates the identification of patterns, trends, potential biases, and outliers in the dataset before their use in ML tasks. The notebook imports the dataset in a CSV format, automatically removes duplicates, and offers various analyses, including occurrences of the target values, molecular similarity analysis through the Tanimoto similarity index, principal component analysis (PCA), and scaling.
