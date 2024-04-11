@@ -1,5 +1,6 @@
 # PythiaCHEM (PYthon Toolkit for macHIne leArning in CHEMistry)
-![Pythia 001](https://github.com/duartegroup/PythiaChem/assets/46780283/4edd66a9-49e6-4f41-877a-95ff5ca1a1aa)
+![Pythia](https://github.com/duartegroup/PythiaChem/assets/46780283/3c007fa8-9299-4d9b-8fa8-7d2162fe413d)
+
 
 A modular toolkit, implemented in Python and organized in Jupyter Notebooks. It employs fingerprints Mordred descriptors and precalculated QM descriptors as input features for shallow learners and ensemble models for regression and classification tasks. 
 
