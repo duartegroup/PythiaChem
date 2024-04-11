@@ -26,7 +26,7 @@ Paper: https://chemrxiv.org/engage/chemrxiv/article-details/6504251fb338ec988a83
 We are working on populating this package with more models and other building blocks.
 
 ### Notebooks:
-Please refers to 'Example-enantioselective-Strecker-synthesis' for the full desmontration of all notebooks.
+Please refer to 'Example-enantioselective-Strecker-synthesis' for the full desmontration of all notebooks.
 - data analysis: data exploration, visualization, scaling
 - regression-fingerprints: regression with fingerprints, data set split, ensemble models
 - regression-Mordred: regression with Mordred, feature elimination techniques, data set split
