@@ -4,7 +4,6 @@
 #https://github.com/flaviucipcigan/ccus_amine_prediction_workflow
 
 # Python packages and utilities
-from datetime import datetime
 import pandas as pd
 import numpy as np
 import os
