@@ -1324,12 +1324,13 @@ def directory_names(classifier_names):
     
     return names
     
-def build_data_from_directory(data_directory, max_folds=10):
+def build_data_from_directory(data_directory, max_folds=10, save=False):
     """
     Function to build a set of data from csv files names K.csv where K is the fold number and the csv
     is the predictions for the test data from that fold
     :param directory: str - name of the directory to read the csv files from
     :param max_fold: int - the number of folds run in the Kfold cv
+    :param save: bool - save the data to a csv file
     """
     
     log = logging.getLogger(__name__)
@@ -1348,11 +1349,14 @@ def build_data_from_directory(data_directory, max_folds=10):
     data["m_index"] = [int(ent) for ent in data["m_index"].values]
     data.set_index("m_index", inplace=True, drop=True, verify_integrity=True)
     data.sort_index(inplace=True)
+
+    if save is True:
+        data.to_csv(os.path.join(data_directory, "all_predictions.csv"))
     
     return data
 
 
-def build_data_from_directory_regr(data_directory, max_folds=10):
+def build_data_from_directory_regr(data_directory, max_folds=10, save=False):
     """
     Function to build a set of data from csv files names K.csv where K is the fold number and the csv
     is the predictions for the test data from that fold
@@ -1376,6 +1380,9 @@ def build_data_from_directory_regr(data_directory, max_folds=10):
     data["index"] = [int(ent) for ent in data["index"].values]
     data.set_index("index", inplace=True, drop=True, verify_integrity=True)
     data.sort_index(inplace=True)
+
+    if save is True:
+        data.to_csv(os.path.join(data_directory, "all_predictions.csv"))
 
     return data
 

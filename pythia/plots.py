@@ -54,7 +54,7 @@ def roc_curve_data(ytest, probs, pos_label=1):
         
 def plot_roc_curve(probas, y_test, title="ROC Curve", x_lab="False Positive Rate (FPR)", 
                    y_lab="True Positive Rate (TPR)", axes=None, figsize=None, plot_class="all",
-                  col_map="viridis", savefigure=False, filename=None, size=(10,10), fontsize=15,
+                  col_map="viridis", savefigure=False, filename=None, size=(10,10), fontsize=24,
                   return_raw_data=False):
     """
     function to plot roc curve
@@ -80,23 +80,38 @@ def plot_roc_curve(probas, y_test, title="ROC Curve", x_lab="False Positive Rate
     if axes is None:
         fig, axes = plt.subplots(1, 1, figsize=size)
 
+    c2 = ['black', 'blue']
     for cls in plot_class:
         cls = int(cls)
         #log.info("probas {} {}".format(probas, probas.shape))
         data[cls]["fpr"], data[cls]["tpr"], data[cls]["thresholds"], data[cls]["auc"] = roc_curve_data(y_test, probas[:, cls], 
                                                                                                        pos_label=cls)
-        col = plt.cm.get_cmap(col_map)(float(cls)/len(plot_class))
-        axes.plot(data[cls]["fpr"],  data[cls]["tpr"], color=col, label="Class {} (auc={:.2f})".format(cls, data[cls]["auc"]))
-        axes.plot([0, 1], [0, 1], "k:")
-        axes.set_xlim([0.0, 1.05])
-        axes.set_ylim([0.0, 1.05])
+        #col = plt.cm.get_cmap(col_map)(float(cls)/len(plot_class))
+        col = c2[cls]
+        axes.plot(data[cls]["fpr"],  data[cls]["tpr"], color=col, linewidth=5,
+                  label="Class {} (auc={:.2f})".format(cls, data[cls]["auc"]))
+        axes.plot([-0.04, 1.04], [-0.04, 1.04], linewidth=5, linestyle="--", color="lightgrey")
+        axes.set_xlim([-0.05, 1.05])
+        axes.set_ylim([-0.05, 1.05])
         axes.set_title("{}".format(title), fontsize=fontsize+2)
         axes.set_xlabel("{}".format(x_lab), fontsize=fontsize+1)
         axes.set_ylabel("{}".format(y_lab), fontsize=fontsize+1)
         axes.legend(loc="lower right", fontsize=fontsize)
         axes.tick_params(labelsize=fontsize)
-        axes.grid(True)
-        #plt.show()
+        axes.grid(False)
+
+        # add background color to the figure
+        axes.patch.set_facecolor('white')
+
+        # add outline to the figure
+        axes.patch.set_edgecolor('black')  
+        axes.patch.set_linewidth(5) 
+
+        # remove axies
+        axes.spines['top'].set_visible(False)
+        axes.spines['right'].set_visible(False)
+        axes.spines['bottom'].set_visible(False)
+        axes.spines['left'].set_visible(False)
         
         if savefigure is True and ax is None:
             if filename is not None:
@@ -128,7 +143,7 @@ def precision_recall_data(y_test, probs, pos_label=1):
 
 def plot_pr_curve(probas, y_test, title="Precision Recall Curve", x_lab="Recall", 
                    y_lab="Precision", axes=None, figsize=None, plot_class="all",
-                  col_map="viridis", savefigure=False, filename=None, size=(10,10), fontsize=15,
+                  col_map="viridis", savefigure=False, filename=None, size=(10,10), fontsize=24,
                   return_raw_data=False):
     """
     function to plot precision recall curve
@@ -154,13 +169,15 @@ def plot_pr_curve(probas, y_test, title="Precision Recall Curve", x_lab="Recall"
     if axes is None:
         fig, axes = plt.subplots(1, 1, figsize=size)
 
+
+    c2 = ['black', 'blue']
     for cls in plot_class:
         cls = int(cls)
         data[cls]["precision"], data[cls]["recall"], data[cls]["thresholds"], data[cls]["ap"] = precision_recall_data(y_test, probas[:, cls], 
                                                                                                        pos_label=cls)
-        col = plt.cm.get_cmap(col_map)(float(cls)/len(plot_class))
-        axes.plot(data[cls]["recall"],  data[cls]["precision"], color=col, label="Class {} (Average Precision={:.2f})".format(cls, data[cls]["ap"]))
-        axes.plot([0, 1], [0, 1], "k:")
+        axes.plot(data[cls]["recall"],  data[cls]["precision"], linewidth=5, color = c2[cls],
+                  label="Class {} (Average Precision={:.2f})".format(cls, data[cls]["ap"]))
+        axes.plot([0, 1], [0, 1], "k:", linewidth=5)
         axes.set_xlim([0.0, 1.05])
         axes.set_ylim([0.0, 1.05])
         axes.set_title("{}".format(title), fontsize=fontsize+2)
@@ -168,8 +185,19 @@ def plot_pr_curve(probas, y_test, title="Precision Recall Curve", x_lab="Recall"
         axes.set_ylabel("{}".format(y_lab), fontsize=fontsize+1)
         axes.legend(loc="lower right", fontsize=fontsize)
         axes.tick_params(labelsize=fontsize)
-        axes.grid(True)
-        #plt.show()
+
+        # add background color to the figure
+        axes.patch.set_facecolor('white')
+
+        # add outline to the figure
+        axes.patch.set_edgecolor('black')
+        axes.patch.set_linewidth(5)
+        
+        # remove axies
+        axes.spines['top'].set_visible(False)
+        axes.spines['right'].set_visible(False)
+        axes.spines['bottom'].set_visible(False)
+        axes.spines['left'].set_visible(False)
         
         if savefigure is True and ax is None:
             if filename is not None:
@@ -183,7 +211,7 @@ def plot_pr_curve(probas, y_test, title="Precision Recall Curve", x_lab="Recall"
     else:
         return axes, data
             
-def plot_confusion_matrix(cmx, axes=None, col_map="Blues", labels=(0, 1), title="Confusion Matrix", x_label="Predicted Class", y_label="Known Class", fontsize=20,
+def plot_confusion_matrix(cmx, axes=None, col_map="Blues", labels=(0, 1), title="Confusion Matrix", x_label="Predicted Class", y_label="Known Class", fontsize=24,
                           annotate = False, vmin=None, vmax=None):
     """
     function to plot the confusion matrix
@@ -194,11 +222,15 @@ def plot_confusion_matrix(cmx, axes=None, col_map="Blues", labels=(0, 1), title=
     log.info("{}\n{}".format(cmx, labels))
     
     cmx_df = pd.DataFrame(data=cmx, columns=labels, index=labels)
-    sns.set(font_scale=2.4)
-    axes = sns.heatmap(cmx_df, annot=True, ax=axes, fmt="d", cmap=col_map)
+    sns.set(font_scale=2.6)
+    axes = sns.heatmap(cmx_df, annot=True, ax=axes, fmt="d", cmap=col_map, linecolor='black', linewidth=5)
     axes.set_title(title, fontsize=fontsize+2)
     axes.set_xlabel(x_label, fontsize=fontsize+1)
     axes.set_ylabel(y_label, fontsize=fontsize+1)
+
+    # add outline to the figure
+    axes.patch.set_edgecolor('black')
+    axes.patch.set_linewidth(5)
     
     display(axes)
     return axes

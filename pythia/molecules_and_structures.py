@@ -253,7 +253,7 @@ def row_col_off_grid(n, mol_row, subimage_size):
     
     return row_index, column_index, grid_offset
 
-def mol_grid(smiles=None, mols=None, mol_row=3, subimage_size=(200, 200), labels=None, filename=None, max_mols=None):
+def mol_grid(smiles=None, mols=None, mol_row=3, subimage_size=(100, 100), labels=None, filename=None, max_mols=None):
     """
     :param mols: list of molecules
     :param mol_rows: number of molecules on a row
@@ -273,14 +273,14 @@ def mol_grid(smiles=None, mols=None, mol_row=3, subimage_size=(200, 200), labels
 
     if filename is None:
         if labels is None:
-            grid = Chem.Draw.MolsToGridImage(mols, molsPerRow=mol_row, subImgSize=(400,400), maxMols=max_mols)
+            grid = Chem.Draw.MolsToGridImage(mols, molsPerRow=mol_row, subImgSize=subimage_size, maxMols=max_mols)
         else:
-            grid = Chem.Draw.MolsToGridImage(mols, molsPerRow=mol_row, subImgSize=(400,400), legends=labels, maxMols=max_mols)
+            grid = Chem.Draw.MolsToGridImage(mols, molsPerRow=mol_row, subImgSize=subimage_size, legends=labels, maxMols=max_mols)
     else:
         if labels is None:
-            grid = Chem.Draw.MolsToGridImage(mols, molsPerRow=mol_row, returnPNG=True,  subImgSize=(400,400), maxMols=max_mols)
+            grid = Chem.Draw.MolsToGridImage(mols, molsPerRow=mol_row, returnPNG=True,  subImgSize=subimage_size, maxMols=max_mols)
         else:
-            grid = Chem.Draw.MolsToGridImage(mols, molsPerRow=mol_row, returnPNG=True, subImgSize=(400,400), legends=labels, maxMols=max_mols)
+            grid = Chem.Draw.MolsToGridImage(mols, molsPerRow=mol_row, returnPNG=True, subImgSize=subimage_size, legends=labels, maxMols=max_mols)
 
         log.info("Image saved as {}".format(filename))
         with open("{}".format(filename, "wb")) as img_png:

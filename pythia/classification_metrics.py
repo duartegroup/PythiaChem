@@ -438,7 +438,7 @@ def calculate_confusion_based_metrics(cmtx=None, df=None, predicted_column_name=
 
 
 
-def calculate_permutation_importance(model_file, x, y, n_repeats=5, n_toplot =7, save=True, random_seed=None):
+def calculate_permutation_importance(model_file, x, y, n_repeats=5, n_toplot =7, save=True, random_seed=None, filename = "test", figsize=(9,9), fontsize=30, color='lightgrey', error_color='darkgrey'):
     """
     Calculate the permutation importance of the features of a model.
     Parameters:
@@ -454,15 +454,27 @@ def calculate_permutation_importance(model_file, x, y, n_repeats=5, n_toplot =7,
     df: the dataframe of feature importance   
     
     """
-    model_name = model_file.split(".")[0].replace("finalized_MLmodel_", "").replace("_", " ")
+    from sklearn.inspection import permutation_importance
+    
+    model_name = model_file.split(".")[0].replace("model_", "").replace("_", " ")
     print(model_name)
     clf = joblib.load(model_file)
     importance = permutation_importance(clf, x, y, n_repeats=n_repeats, random_state=random_seed)
     
-    features = x.columns
+
+    features_names = x.columns
+    features = []
+    for a in features_names:
+        if str(a).startswith("time_between_transporter_added_and_lysis_(s)"):
+            a= str(a).replace("time_between_transporter_added_and_lysis_(s)","$\Delta t$")
+        if str(a).startswith("cl_conc_(mm)"):
+            a= str(a).replace("cl_conc_(mm)", "[Cl$^{-}]$")
+        features.append(str(a))
 
     # make a dataframe with two columns from two lists features and feature_importance
-    df = pd.DataFrame({'feature': features, 'importance': importance.importances_mean, 'importance_std': importance.importances_std})
+    df = pd.DataFrame({'feature': features, 
+                       'importance': importance.importances_mean, 
+                       'importance_std': importance.importances_std})
     # add a column with absolute values of feature importance
     df['abs_importance'] = df['importance'].abs()
     # sort the dataframe by absolute value of feature importance in descending order
@@ -472,28 +484,51 @@ def calculate_permutation_importance(model_file, x, y, n_repeats=5, n_toplot =7,
     df['feature'] = df['feature'].astype(str)
 
     if save:
-        df.to_csv("feature_importance_permutation_{}.csv".format(model_name))
-        print("Saved feature importance to feature_importance_permutation_{}.csv".format(model_name))
+        df.to_csv("feature_importance_permutation_{}_{}.csv".format(filename, model_name))
 
     # plot the N most important features
     N = n_toplot
-    plt.figure(figsize=(7,6), dpi=300)
-    plt.title("{}".format(model_name))
-    plt.bar(df['feature'][:N], df['importance'][:N], align='center', color = 'lightgrey')
-    # add error bars
-    plt.errorbar(df['feature'][:N], df['importance'][:N], yerr=df['importance_std'][:N], fmt='none', capsize=3, color = 'darkgrey')
-    plt.xticks(rotation=90)
-    plt.ylabel('Importance')
-    plt.xlabel('Feature')
-    plt.tight_layout()
+    fig, axes = plt.subplots(figsize=figsize, dpi=300)
+    axes.barh(df['feature'][:N], df['importance'][:N], align='center', color = color)
+    axes.errorbar(df['importance'][:N], df['feature'][:N], xerr=df['importance_std'][:N], 
+                  fmt='o', 
+                  capsize=10, 
+                  color = error_color)
+    axes.set_title("{}, {}".format(model_name, filename), fontsize=fontsize+2)
+    axes.set_xlabel('Permutation importance', fontsize=fontsize+1, labelpad=10)
+    axes.set_ylabel('Feature', fontsize=fontsize+1, labelpad=10)
+    axes.tick_params(labelsize=fontsize)
+    axes.grid(False)
     
-    if save:
-        plt.savefig("feature_importance_permutation_{}.png".format(model_name))
-        print("Saved feature importance plot to feature_importance_permutation_{}.png".format(model_name))
+    # invert the y axis
+    axes.invert_yaxis()
 
-    plt.show() 
+    # add background color to the figure
+    axes.patch.set_facecolor('white')
+
+    # add outline to the figure
+    axes.patch.set_edgecolor('black')
+    axes.patch.set_linewidth(5)
+
+    # set tickmarks to face inwards
+    axes.tick_params(direction='in')
+
+    # set tickmark padding
+    axes.tick_params(pad=10)
+    
+    
+    #remove the frame
+    for _, spine in axes.spines.items():
+        spine.set_visible(False)
+
+
+    if save:
+        fig.savefig("fig_feature_importance_permutation_{}_{}.png".format(filename, model_name))
+
+    #plt.show() 
 
     return df
+
 
 
 
