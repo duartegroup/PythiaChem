@@ -1,79 +1,84 @@
 #!/usr/bin/env python
 
 # parts of this code are inspired by Chemical Space Analysis and Property Prediction for Carbon Capture Amine Molecules.
-#https://chemrxiv.org/engage/chemrxiv/article-details/6465d217f2112b41e9bebcc8
+#https://doi.org/10.1039/D3DD00073G
 #https://zenodo.org/records/10213104
 #https://github.com/flaviucipcigan/ccus_amine_prediction_workflow
 
 
-import os
-import logging
-import pandas as pd
-import numpy as np
-import scipy
-import pickle
+# Python packages and utilities
 import csv
+import logging
+import math
+import os
+import pickle
+from IPython.display import Image, display
+from pickle import dump
 
-#RDKit
-from rdkit import Chem
-from rdkit.Chem import AllChem
-from rdkit.Chem.Draw import IPythonConsole
-from rdkit.Chem import Draw
-from rdkit.Chem.Draw import DrawingOptions
-from rdkit.Chem import Descriptors, rdMolDescriptors
-from rdkit import DataStructs
+import numpy as np
+import pandas as pd
+import scipy
+import scipy.stats as stats
+
+# matplotlib
+import matplotlib.pyplot as plt
+import matplotlib.font_manager
+# Update the matplotlib font configuration
+plt.rcParams['font.family'] = 'Arial'  # or any other font available on your system
+# mlxtend
+import mlxtend
+from mlxtend.evaluate import permutation_test as pt
+
+# RDKit
+from rdkit import Chem, DataStructs
+from rdkit.Chem import AllChem, Descriptors, Draw, rdMolDescriptors
+from rdkit.Chem.Draw import DrawingOptions, IPythonConsole
 
 # scikit-learn
-from sklearn.model_selection import train_test_split, GridSearchCV, cross_validate, KFold
-from sklearn.compose import ColumnTransformer
-from sklearn.feature_selection import RFECV, RFE
 from sklearn import metrics
-from sklearn.preprocessing import MinMaxScaler
-from sklearn.neural_network import MLPClassifier
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.svm import SVC
+from sklearn.compose import ColumnTransformer
+from sklearn.ensemble import AdaBoostClassifier, ExtraTreesClassifier, RandomForestClassifier
+from sklearn.feature_selection import RFE, RFECV
 from sklearn.gaussian_process import GaussianProcessClassifier
-from sklearn.gaussian_process.kernels import RBF, Matern, WhiteKernel
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier,ExtraTreesClassifier
-from sklearn.naive_bayes import GaussianNB
-from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis
+from sklearn.gaussian_process.kernels import Matern, RBF, WhiteKernel
 from sklearn.linear_model import LogisticRegression
-from sklearn.preprocessing import StandardScaler # This is sklearns auto-scaling function
-from sklearn.metrics import confusion_matrix,ConfusionMatrixDisplay #, plot_confusion_matrix
-from sklearn.metrics import classification_report
-from sklearn.metrics import average_precision_score
-from sklearn.metrics import classification_report
-from sklearn.metrics import roc_curve, auc
-from sklearn.model_selection import RepeatedKFold
-from sklearn.metrics import precision_recall_fscore_support
-from sklearn.metrics import explained_variance_score
-from sklearn.metrics import mean_absolute_error
-from sklearn.metrics import mean_squared_error
-from sklearn.metrics import r2_score
-from sklearn.preprocessing import OneHotEncoder, StandardScaler, MinMaxScaler
+from sklearn.metrics import (average_precision_score, classification_report, confusion_matrix,
+                             ConfusionMatrixDisplay, explained_variance_score, mean_absolute_error,
+                             mean_squared_error, precision_recall_fscore_support, r2_score, roc_curve, auc)
+from sklearn.model_selection import (GridSearchCV, KFold, RepeatedKFold, cross_validate,
+                                     train_test_split)
+from sklearn.naive_bayes import GaussianNB
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.neural_network import MLPClassifier
+from sklearn.preprocessing import MinMaxScaler, OneHotEncoder, StandardScaler
+from sklearn.svm import SVC
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis
+
 # scikit-imbalanced learn
-from imblearn.over_sampling import SMOTE, SMOTENC, SMOTEN
 from imblearn.metrics import classification_report_imbalanced, sensitivity_specificity_support
+from imblearn.over_sampling import SMOTE, SMOTENC, SMOTEN
 
-
-import math
+# seaborn
+import seaborn as sns
 
 # Own modules
 from . import classification_metrics as cmetrics
 from . import scaling
-# stats and plotting
-import scipy.stats as stats
-import matplotlib.pyplot as plt
-import seaborn as sns
-import mlxtend
-from mlxtend.evaluate import permutation_test as pt
-from IPython.display import Image, display
-import pickle
-from pickle import dump
+
 
 def df_corr(x, y, corr_method):
     """
+    Calculate the correlation between two arrays using the specified method.
+
+    Parameters:
+    x (array-like): The first array of data.
+    y (array-like): The second array of data.
+    corr_method (str): The method to use for correlation calculation.
+                       Possible methods are 'pearson', 'kendall', 'spearman'.
+
+    Returns:
+    pandas.DataFrame: A DataFrame containing the correlation matrix.
     """
     df = pd.DataFrame(data=np.array([x, y]).T)
     corr = df.corr(method=corr_method)
@@ -85,8 +90,8 @@ def find_correlating_features(features, targets, thresh=0.4, plot=True, process_
                               corr_method="spearman", sig_metric=None, significance=False,
                               random_seed=105791, n_sample=10000, sig_level=0.05):
     """
-    Pulls out features which correlate with a property bay at least the threshold as measure by the Pearson correlation
-    coefficent (R) [-1, 1].
+    Pulls out features which correlate with a property bay at least the threshold as measured by the specified correlation method.
+
     :param features: pandas dataframe - pandas data frame of features to correlate against a property
     :param targets: pandas series - pandas series of property target values
     :param thresh: float - Pearson correlation coefficent threshold to be equal to or more than
@@ -285,13 +290,29 @@ def constant_value_columns(df):
 
 def grid_search_classifier_parameters(clf, Xtrain, ytrain, clf_options, clf_names, iteration, no_train_output, cv=5, name=None, scoring=("roc_auc", "precision", "recall")):
     """
-    Grid search calssifer hyperparams and find the best report metrics if requested
+    Perform a grid search to optimize classifier hyperparameters and report metrics if requested.
+
+    Parameters:
+    clf (estimator object): The classifier to be optimized.
+    Xtrain (array-like or pandas DataFrame): Training feature set.
+    ytrain (array-like or pandas DataFrame): Training target labels.
+    clf_options (dict): A dictionary where keys are classifier names and values are dictionaries of hyperparameters to be optimized.
+    clf_names (list): A list of classifier names corresponding to the keys in clf_options.
+    iteration (int): The current iteration index for selecting the classifier from clf_names.
+    no_train_output (bool): If False, outputs the grid search metrics to a CSV file.
+    cv (int, default=5): Number of cross-validation folds.
+    name (str, optional): The name to be used for output files.
+    scoring (tuple, default=("roc_auc", "precision", "recall")): A tuple of scoring metrics to evaluate during grid search.
+
+    Returns:
+    dict: The best hyperparameters found during the grid search.
+
     """
     log = logging.getLogger(__name__)
     
     # Grid search model optimizer
     parameters = clf_options[clf_names[iteration]]
-    log.debug("\tname: {} parameters: {}".format(name, parameters))
+    # log.debug("\tname: {} parameters: {}".format(name, parameters))
     
     optparam_search = GridSearchCV(clf, parameters, cv=cv, error_score=np.nan, scoring=scoring, refit=scoring[0], return_train_score=True)
     log.debug("\tCV xtrain: {}".format(Xtrain))
@@ -302,11 +323,11 @@ def grid_search_classifier_parameters(clf, Xtrain, ytrain, clf_options, clf_name
     if no_train_output is False:
         reported_metrics = pd.DataFrame(data=optparam_search.cv_results_)
         reported_metrics.to_csv("{}/{}_grid_search_metrics.csv".format(name,name))
-        log.info("\tBest parameters; {}".format(opt_parameters))
-        for mean, std, params in zip(optparam_search.cv_results_["mean_test_{}".format(scoring[0])], 
-                                     optparam_search.cv_results_["std_test_{}".format(scoring[0])], 
-                                     optparam_search.cv_results_['params']):
-            log.info("\t{:.4f} (+/-{:.4f}) for {}".format(mean, std, params))
+        #log.info("\tBest parameters; {}".format(opt_parameters))
+        #for mean, std, params in zip(optparam_search.cv_results_["mean_test_{}".format(scoring[0])],
+        #                            optparam_search.cv_results_["std_test_{}".format(scoring[0])],
+        #                           optparam_search.cv_results_['params']):
+        # log.info("\t{:.4f} (+/-{:.4f}) for {}".format(mean, std, params))
     else:
         pass
     
@@ -316,7 +337,23 @@ def grid_search_classifier_parameters(clf, Xtrain, ytrain, clf_options, clf_name
 def grid_search_regressor_parameters(rgs, Xtrain, ytrain, rgs_options, rgs_names, iteration, no_train_output, cv=5,
                                      name=None, scoring=("r2", "neg_root_mean_squared_error")):
     """
-    Grid search calssifer hyperparams and find the best report metrics if requested
+    Perform a grid search to optimize regressor hyperparameters and report metrics if requested.
+
+    Parameters:
+    rgs (estimator object): The regressor to be optimized.
+    Xtrain (array-like or pandas DataFrame): Training feature set.
+    ytrain (array-like or pandas DataFrame): Training target values.
+    rgs_options (dict): A dictionary where keys are regressor names and values are dictionaries of hyperparameters to be optimized.
+    rgs_names (list): A list of regressor names corresponding to the keys in rgs_options.
+    iteration (int): The current iteration index for selecting the regressor from rgs_names.
+    no_train_output (bool): If False, outputs the grid search metrics to a CSV file.
+    cv (int, default=5): Number of cross-validation folds.
+    name (str, optional): The name to be used for output files.
+    scoring (tuple, default=("r2", "neg_root_mean_squared_error")): A tuple of scoring metrics to evaluate during grid search.
+
+    Returns:
+    dict: The best hyperparameters found during the grid search.
+
     """
     log = logging.getLogger(__name__)
 
@@ -337,12 +374,12 @@ def grid_search_regressor_parameters(rgs, Xtrain, ytrain, rgs_options, rgs_names
     if no_train_output is False:
         reported_metrics = pd.DataFrame(data=optparam_search.cv_results_)
         reported_metrics.to_csv("{}/{}_grid_search_metrics.csv".format(name, name))
-        log.info("\tBest parameters; {}".format(opt_parameters))
+        #log.info("\tBest parameters; {}".format(opt_parameters))
 
-        for mean, std, params in zip(optparam_search.cv_results_["mean_test_{}".format(scoring[0])],
-                                     optparam_search.cv_results_["std_test_{}".format(scoring[0])],
-                                     optparam_search.cv_results_['params']):
-            log.info("\t{:.4f} (+/-{:.4f}) for {}".format(mean, std, params))
+        #for mean, std, params in zip(optparam_search.cv_results_["mean_test_{}".format(scoring[0])],
+        #                        optparam_search.cv_results_["std_test_{}".format(scoring[0])],
+        #                       optparam_search.cv_results_['params']):
+            #log.info("\t{:.4f} (+/-{:.4f}) for {}".format(mean, std, params))
     else:
         pass
 
@@ -463,7 +500,30 @@ def split_test_regressors_with_optimization(df, targets, test_df, test_targets, 
                                             n_repeats=20, rgs_names=None,
                                             no_train_output=False, random_seed=107901, overwrite=True):
     """
-    function to run regression
+    Perform regression using multiple regressors with optional hyperparameter optimization and evaluation.
+
+    Args:
+    df (pd.DataFrame): Training data features.
+    targets (pd.Series or np.array): Training data targets.
+    test_df (pd.DataFrame): Test data features.
+    test_targets (pd.Series or np.array): Test data targets.
+    regressors (list of sklearn regressor objects): List of regressor objects to be trained and evaluated.
+    rgs_options (dict): Dictionary where keys are regressor names and values are dictionaries of hyperparameters to optimize.
+    scale (bool, optional): Whether to scale the data (default is True).
+    cv (int, optional): Number of cross-validation folds (default is 5).
+    n_repeats (int, optional): Number of times to repeat the experiment (default is 20).
+    rgs_names (list, optional): Names of the regressors (default is None, uses index-based names).
+    no_train_output (bool, optional): If True, do not output training metrics to CSV files (default is False).
+    random_seed (int, optional): Random seed for reproducibility (default is 107901).
+    overwrite (bool, optional): Whether to overwrite existing directories (default is True).
+
+    Returns:
+    None
+
+    Notes:
+    - Performs hyperparameter optimization using grid search for each regressor.
+    - Evaluates each regressor on the training and test sets.
+    - Saves regression metrics (variance, MAE, MSE, RMSE, R2) and prediction plots for each regressor.
     """
 
     log = logging.getLogger(__name__)
@@ -552,6 +612,10 @@ def split_test_regressors_with_optimization(df, targets, test_df, test_targets, 
         # Alternatives include bmh, fivethirtyeight, ggplot,
         # dark_background, seaborn-deep, etc
         plt.style.use('default')
+
+        plt.rcParams['font.family'] = 'Arial'
+        #plt.rcParams['font.serif'] = 'Ubuntu'
+        #plt.rcParams['font.monospace'] = 'Ubuntu Mono'
         plt.rcParams['font.size'] = 20
         plt.rcParams['axes.labelsize'] = 20
         plt.rcParams['axes.labelweight'] = 'bold'
@@ -564,8 +628,8 @@ def split_test_regressors_with_optimization(df, targets, test_df, test_targets, 
         plt.figure(figsize=(9, 9), dpi=300)
         plt.scatter(targets, train_predictions, s=60, alpha=0.6,edgecolors="k", color='silver', label="Train")
         plt.scatter(test_targets, test_predictions, s=60,alpha=0.6, edgecolors="k", color='blue', label="Test")
-        plt.ylabel('Predicted')
-        plt.xlabel('Experimental')
+        plt.ylabel('Predicted Δ∆$G^{‡}$ (kJ/mol)')
+        plt.xlabel('Experimental Δ∆$G^{‡}$ (kJ/mol)')
         plt.legend(loc='lower right')
         plt.title(name.replace("_", " "))
         plt.plot([-0.05, 11], [-0.05, 11], "k:")
@@ -1167,6 +1231,28 @@ def test_classifiers_with_optimization(df, test_df, classes, testclasses, classi
             "\tImbalance classification report:\n{}".format(classification_report_imbalanced(ytest, predicted_clf)))
         output_dict = classification_report_imbalanced(ytest, predicted_clf, output_dict=True)
 
+        ## Plot the roc curves
+        #ax = plt.subplot(2, plt_rows, kf_iteration + 1)
+        #ax.plot(fpr, tpr, color="red",
+        #        lw=1.5, label="ROC curve (auc = {:.2f})".format(roc_auc))
+
+        #ax.plot(fpr, tpr, alpha=0.0, color="white", lw=1.5,
+        #        label="pre_class0 = {:.2f}\n".format(output_dict[0]['pre']) + "pre_class1 = {:.2f}".format(
+        #            output_dict[1]['pre']))
+        #ax.plot(fpr, tpr, alpha=0.0, color="white", lw=1.5,
+        #        label="f1_class0 = {:.2f}\n".format(output_dict[0]['f1']) + "f1_class1 = {:.2f}".format(
+        #            output_dict[1]['f1']))
+        #ax.plot(fpr, tpr, alpha=0.0, color="white", lw=1.5,
+        #        label="rec_class0 = {:.2f}\n".format(output_dict[0]['rec']) + "rec_class1 = {:.2f}".format(
+        #            output_dict[1]['rec']))
+
+        #ax.plot([0, 1], [0, 1], "k:")
+        #ax.set_xlim(xmin=0.0, xmax=1.01)
+        #ax.set_ylim(ymin=0.0, ymax=1.01)
+        #ax.set_xlabel('False Positive Rate')
+        #ax.set_ylabel('True Positive Rate')
+        #ax.legend(loc="lower right")
+
         list_report.append(classification_report_imbalanced(ytest, predicted_clf))
 
         sensitvity, specificity, support = sensitivity_specificity_support(ytest, predicted_clf)
@@ -1181,6 +1267,8 @@ def test_classifiers_with_optimization(df, test_df, classes, testclasses, classi
         pred = pd.DataFrame(pred)
         pred.T.to_csv("{}/{}.csv".format(name, kf_iteration))
         kf_iteration = kf_iteration + 1
+
+        # Plot and assess classifier over all folds
 
         # NOTE - rows are scores columns are classes
         average_scores = np.mean(score_list, axis=0)
@@ -1211,6 +1299,11 @@ def test_classifiers_with_optimization(df, test_df, classes, testclasses, classi
             std_scores[3][1])
         score_str3 = "Average ROC AUCs: {:.2f} +/- {:.2f}".format(average_roc_auc, std_roc_auc)
         score_text = "{}\n{}\n{}".format(score_str1, score_str2, score_str3)
+        plt.annotate(score_text, xy=(0.5, 0), xytext=(0, 0), xycoords="figure fraction", textcoords='offset points',
+                     size=12, ha='center', va='bottom')
+        #figure.tight_layout()
+        #plt.savefig("{0}/{0}_roc_curves.png".format(name))
+        #plt.show()
 
         iteration = iteration + 1
     log_df["opt_param"] = pd.Series(list_opt_param)
@@ -1231,13 +1324,12 @@ def directory_names(classifier_names):
     
     return names
     
-def build_data_from_directory(data_directory, max_folds=10, save=False):
+def build_data_from_directory(data_directory, max_folds=10):
     """
     Function to build a set of data from csv files names K.csv where K is the fold number and the csv
     is the predictions for the test data from that fold
     :param directory: str - name of the directory to read the csv files from
     :param max_fold: int - the number of folds run in the Kfold cv
-    :param save: bool - save the data to a csv file
     """
     
     log = logging.getLogger(__name__)
@@ -1256,20 +1348,16 @@ def build_data_from_directory(data_directory, max_folds=10, save=False):
     data["m_index"] = [int(ent) for ent in data["m_index"].values]
     data.set_index("m_index", inplace=True, drop=True, verify_integrity=True)
     data.sort_index(inplace=True)
-
-    if save is True:
-        data.to_csv(f'{data_directory}/all_predictions.csv')
     
     return data
 
 
-def build_data_from_directory_regr(data_directory, max_folds=10, save=False):
+def build_data_from_directory_regr(data_directory, max_folds=10):
     """
     Function to build a set of data from csv files names K.csv where K is the fold number and the csv
     is the predictions for the test data from that fold
     :param directory: str - name of the directory to read the csv files from
     :param max_fold: int - the number of folds run in the Kfold cv
-    :param save: bool - save the data to a csv file
     """
 
     log = logging.getLogger(__name__)
@@ -1288,9 +1376,6 @@ def build_data_from_directory_regr(data_directory, max_folds=10, save=False):
     data["index"] = [int(ent) for ent in data["index"].values]
     data.set_index("index", inplace=True, drop=True, verify_integrity=True)
     data.sort_index(inplace=True)
-
-    if save is True:
-        data.to_csv(f'{data_directory}/all_predictions.csv')
 
     return data
 
@@ -1335,6 +1420,10 @@ def metrics_for_regression(directories=('LassoCV', 'KNeighborsRegressor', 'Decis
         # Alternatives include bmh, fivethirtyeight, ggplot,
         # dark_background, seaborn-deep, etc
         plt.style.use('default')
+
+        plt.rcParams['font.family'] = 'Arial'
+        #plt.rcParams['font.serif'] = 'Ubuntu'
+        #plt.rcParams['font.monospace'] = 'Ubuntu Mono'
         plt.rcParams['font.size'] = 20
         plt.rcParams['axes.labelsize'] = 20
         plt.rcParams['axes.labelweight'] = 'bold'
@@ -1352,8 +1441,8 @@ def metrics_for_regression(directories=('LassoCV', 'KNeighborsRegressor', 'Decis
 
         fig, ax = plt.subplots(figsize=(9, 9), dpi=300)
         ax.scatter(data['known'], data['prediction'], s=60, alpha=0.6, edgecolors="k", color='silver')
-        ax.set_ylabel('Predicted')
-        ax.set_xlabel('Experimental')
+        ax.set_ylabel('Predicted Δ∆$G^{‡}$ (kJ/mol)')
+        ax.set_xlabel('Experimental Δ∆$G^{‡}$ (kJ/mol)')
         plt.plot([-0.05, 11], [-0.05, 11], "k:")
         ax.set_title(titlename)
 
@@ -1642,10 +1731,6 @@ def feature_categorization(features_df, feature_types="some_categorical", catego
         log.info(pd.DataFrame(features_df, columns=feature_columns))
         features_df = pd.DataFrame(features_df, columns=feature_columns)
 
-    # ...
-
-    # ...
-
     elif feature_types == "some_categorical":
         numeric_features = [feature_columns[i] for i in range(len(feature_columns)) if i not in categorical_indxs]
         numerical_transformer = MinMaxScaler()
@@ -1732,6 +1817,28 @@ def feature_categorization(features_df, feature_types="some_categorical", catego
     return features_df,categorical_indxs
 
 def ensemble(csv_files):
+    """
+        Compute ensemble predictions from multiple CSV files containing predicted and actual values,
+        calculate regression metrics, and plot the results.
+
+        Args:
+        csv_files (list of str): List of CSV file paths. Each CSV file should contain 'actual' and 'predicted' columns.
+
+        Returns:
+        dict: Dictionary containing the calculated regression metrics:
+              - 'mae': Mean Absolute Error
+              - 'mse': Mean Squared Error
+              - 'rmse': Root Mean Squared Error
+              - 'r2': R-squared score
+
+        Notes:
+        - Reads predicted values from each CSV file.
+        - Calculates the mean of predicted values.
+        - Uses actual values from the first CSV file.
+        - Computes regression metrics (MAE, MSE, RMSE, R2) based on the ensemble predictions.
+        - Plots the scatter plot of actual vs. predicted values.
+    """
+
     log = logging.getLogger(__name__)
     predicted_values = []
 
@@ -1762,8 +1869,8 @@ def ensemble(csv_files):
 
     plt.figure(figsize=(6, 4))
     plt.scatter(actual, mean_predicted, color='blue', marker='x')
-    plt.ylabel('Predicted', fontsize=13)
-    plt.xlabel('Experimental', fontsize=13)
+    plt.ylabel('Predicted Δ∆$G^{‡}$ (kJ/mol)', fontsize=13)
+    plt.xlabel('Experimental Δ∆$G^{‡}$ (kJ/mol)', fontsize=13)
     plt.plot([-0.05, 11], [-0.05, 11], "k:")
 
     plt.xticks(np.arange(0, 12, step=2))
