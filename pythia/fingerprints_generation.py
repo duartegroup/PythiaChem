@@ -1,19 +1,22 @@
 #!/usr/bin/env python
 
 # parts of this code are inspired by Chemical Space Analysis and Property Prediction for Carbon Capture Amine Molecules.
-#https://chemrxiv.org/engage/chemrxiv/article-details/6465d217f2112b41e9bebcc8
+#https://doi.org/10.1039/D3DD00073G
 #https://zenodo.org/records/10213104
 #https://github.com/flaviucipcigan/ccus_amine_prediction_workflow
 
+# Logging
+import logging
 
 # Python packages and utilities
 import os
-import pandas as pd
+from datetime import datetime
 import numpy as np
+import pandas as pd
 import scipy
 from scipy import spatial
 
-#RDKit
+# RDKit
 from rdkit import Chem
 from rdkit.Chem.Draw import IPythonConsole
 from rdkit.Chem import Draw
@@ -26,16 +29,12 @@ from rdkit.Chem import rdMolDescriptors
 from rdkit.Chem.Draw import rdMolDraw2D
 from rdkit.Chem import DataStructs
 from rdkit.Chem.AllChem import GetHashedAtomPairFingerprintAsBitVect
-
-# disp
+# IPython display
 from IPython.display import SVG, Image, display
 
-# Logging
-import logging
-
-
-# own modules
+# Own modules
 from . import molecules_and_structures as mi
+
 
 def rdkit_fingerprints(smiles):
     """
@@ -49,7 +48,6 @@ def rdkit_fingerprints(smiles):
     fps = [Chem.RDKFingerprint(mol) for mol in mols]
 
     return fps
-
 def maccskeys_fingerprints(smiles):
     """
     Function to get MACCS fingerprints
@@ -62,14 +60,9 @@ def maccskeys_fingerprints(smiles):
     fps = [MACCSkeys.GenMACCSKeys(mol) for mol in mols]
     A = np.mat(fps)
     df = pd.DataFrame(data=A)
-
-    # add 'fp_' to the column names because interger column names cause problems in pandas
-    df.columns = ['fp_' + str(i) for i in df.columns]
-
-
     return fps,df
 
-def atom_pair_fingerprints(smiles, nBits = 1024, bit_vec=True, return_only_non_zero=False, log_explanation=False):
+def atom_pair_fingerprints(smiles, nBits = 1024, bit_vec=False, return_only_non_zero=False, log_explanation=False):
     """
     Function to get atom pair fingerprints
     :param smiles: list - smiles representation of the molecules to make fingerprints of
@@ -96,16 +89,9 @@ def atom_pair_fingerprints(smiles, nBits = 1024, bit_vec=True, return_only_non_z
         for inx, fp in enumerate(fps):
             log.info("Atom pair finger print number {}:\n\texplanation: {}".format(inx, Pairs.ExplainPairScore(fp)))
     
-    A = np.mat(fps)
-    df = pd.DataFrame(data=A)
+    return fps
 
-    # add 'fp_' to the column names because interger column names cause problems in pandas
-    df.columns = ['fp_' + str(i) for i in df.columns]
-
-    return fps,df
-
-
-def torsion_fingerprints(smiles, nBits = 1024, bit_vec=True, return_only_non_zero=False, log_explanation=False):
+def torsion_fingerprints(smiles, nBits = 1024, bit_vec=False, return_only_non_zero=False, log_explanation=False):
     """
     Function to get topological fingerprints
     :param smiles: list - smiles representation of the molecules to make fingerprints of
@@ -121,7 +107,6 @@ def torsion_fingerprints(smiles, nBits = 1024, bit_vec=True, return_only_non_zer
     
     if bit_vec is True:
         fps = [rdMolDescriptors.GetHashedTopologicalTorsionFingerprintAsBitVect(mol, nBits = nBits) for mol in mols]
-        
     else:
         fps = [rdMolDescriptors.GetTopologicalTorsionFingerprint(mol) for mol in mols]
     
@@ -132,14 +117,7 @@ def torsion_fingerprints(smiles, nBits = 1024, bit_vec=True, return_only_non_zer
         for inx, fp in enumerate(fps):
             log.info("Topological torsion finger print number {}:\n\texplanation: {}".format(inx, Pairs.ExplainPairScore(fp)))
     
-    A = np.mat(fps)
-    df = pd.DataFrame(data=A)
-
-    # add 'fp_' to the column names because interger column names cause problems in pandas
-    df.columns = ['fp_' + str(i) for i in df.columns]
-
-    return fps,df
-
+    return fps
 
 def morgan_fingerprints(smiles, radius=2, n_bits=1024, bit_vec=True, feature_invarients=False, return_only_non_zero=True, log_explanation=False):
     """
@@ -169,9 +147,6 @@ def morgan_fingerprints(smiles, radius=2, n_bits=1024, bit_vec=True, feature_inv
 
     A = np.mat(fps)
     df = pd.DataFrame(data=A)
-
-    # add 'fp_' to the column names because interger column names cause problems in pandas
-    df.columns = ['fp_' + str(i) for i in df.columns]
 
     return fps,df
 
@@ -306,8 +281,33 @@ def bits_to_text(fp):
 
 def bulk_similarity(fp, fp_targets, test=False, thresh=0.5):
     """
-    Function to compare one fp with a list of others and get all the scores
-    """
+        Computes Tanimoto similarity between a reference fingerprint and a list of target fingerprints.
+
+        Parameters:
+        -----------
+        fp : ExplicitBitVect
+            Reference fingerprint to compare against fp_targets.
+        fp_targets : List[ExplicitBitVect]
+            List of target fingerprints to compare with fp.
+        test : bool, optional (default=False)
+            If True, filters results to include only similarities >= thresh.
+        thresh : float, optional (default=0.5)
+            Threshold value for similarity score filtering.
+
+        Returns:
+        --------
+        pandas.DataFrame
+            DataFrame with columns:
+                - 'number': Index number of each target fingerprint.
+                - 'fp_reference': Reference fingerprint (fp) converted to string representation.
+                - 'fp_target': String representations of each target fingerprint.
+                - 'tanimoto_similarity': Tanimoto similarity score between fp and each target fingerprint.
+
+        Notes:
+        ------
+        Tanimoto similarity ranges from 0 (no similarity) to 1 (identical).
+        If 'test' is True, returns only rows where 'tanimoto_similarity' >= 'thresh'.
+        """
     
     log = logging.getLogger(__name__)
     

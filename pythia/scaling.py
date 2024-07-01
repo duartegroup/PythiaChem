@@ -1,10 +1,10 @@
 #!/usr/bin/env python
-import sys
-import os
 import logging
-import pandas as pd
-import numpy as np
 import math
+import numpy as np
+import os
+import pandas as pd
+import sys
 
 def autoscale(df):
     """

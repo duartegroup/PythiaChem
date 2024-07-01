@@ -1,44 +1,37 @@
 #!/usr/bin/ent python
 
 # parts of this code are inspired by Chemical Space Analysis and Property Prediction for Carbon Capture Amine Molecules.
-#https://chemrxiv.org/engage/chemrxiv/article-details/6465d217f2112b41e9bebcc8
+#https://doi.org/10.1039/D3DD00073G
 #https://zenodo.org/records/10213104
 #https://github.com/flaviucipcigan/ccus_amine_prediction_workflow
 
-
-# numerics and data packages
+# Standard libraries
+import logging
+import matplotlib.pyplot as plt
 import pandas as pd
+
+# NumPy
 import numpy as np
 
+# Joblib
 import joblib
 
-# sklearn
+# Scikit-learn
 import sklearn
-from sklearn.metrics import confusion_matrix
-from sklearn.metrics import ConfusionMatrixDisplay
-from sklearn.metrics import roc_curve
-from sklearn.metrics import RocCurveDisplay
-from sklearn.metrics import precision_recall_curve
-from sklearn.metrics import PrecisionRecallDisplay
+from sklearn.metrics import ConfusionMatrixDisplay, PrecisionRecallDisplay, RocCurveDisplay, confusion_matrix, precision_recall_curve, roc_curve
 from sklearn.inspection import permutation_importance
 
-# imbalanced
-from imblearn.metrics import classification_report_imbalanced 
-from imblearn.metrics import sensitivity_specificity_support
+# Imbalanced-learn
+from imblearn.metrics import classification_report_imbalanced, sensitivity_specificity_support
 
-# depreciated package be careful
+# Deprecated package (handle with care)
 try:
     import scikitplot as skplt
 except ModuleNotFoundError:
-    print("Scikit plot not avaliable")
+    print("Scikit plot not available")
 
+# Custom module
 from . import plots as pltsk
-
-# matplotlib
-import matplotlib.pyplot as plt
-
-# logging
-import logging 
 
 
 
@@ -445,7 +438,7 @@ def calculate_confusion_based_metrics(cmtx=None, df=None, predicted_column_name=
 
 
 
-def calculate_permutation_importance(model_file, x, y, n_repeats=5, n_toplot =7, save=True, random_seed=None, filename = "test"):
+def calculate_permutation_importance(model_file, x, y, n_repeats=5, n_toplot =7, save=True, random_seed=None):
     """
     Calculate the permutation importance of the features of a model.
     Parameters:
@@ -461,20 +454,12 @@ def calculate_permutation_importance(model_file, x, y, n_repeats=5, n_toplot =7,
     df: the dataframe of feature importance   
     
     """
-    model_name = model_file.split(".")[0].replace("model_", "").replace("_", " ")
+    model_name = model_file.split(".")[0].replace("finalized_MLmodel_", "").replace("_", " ")
     print(model_name)
     clf = joblib.load(model_file)
     importance = permutation_importance(clf, x, y, n_repeats=n_repeats, random_state=random_seed)
     
-
-    features_names = x.columns
-    features = []
-    for a in features_names:
-        if str(a).startswith("time_between_transporter_added_and_lysis_(s)"):
-            a= str(a).replace("time_between_transporter_added_and_lysis_(s)","$\Delta t$")
-        if str(a).startswith("cl_conc_(mm)"):
-            a= str(a).replace("cl_conc_(mm)", "[Cl$^{-}]$")
-        features.append(str(a))
+    features = x.columns
 
     # make a dataframe with two columns from two lists features and feature_importance
     df = pd.DataFrame({'feature': features, 'importance': importance.importances_mean, 'importance_std': importance.importances_std})
@@ -487,12 +472,13 @@ def calculate_permutation_importance(model_file, x, y, n_repeats=5, n_toplot =7,
     df['feature'] = df['feature'].astype(str)
 
     if save:
-        df.to_csv("feature_importance_permutation_{}_{}.csv".format(filename, model_name))
+        df.to_csv("feature_importance_permutation_{}.csv".format(model_name))
+        print("Saved feature importance to feature_importance_permutation_{}.csv".format(model_name))
 
     # plot the N most important features
     N = n_toplot
-    plt.figure(figsize=(10,10), dpi=300)
-    plt.title("{}, {}".format(model_name, filename))
+    plt.figure(figsize=(7,6), dpi=300)
+    plt.title("{}".format(model_name))
     plt.bar(df['feature'][:N], df['importance'][:N], align='center', color = 'lightgrey')
     # add error bars
     plt.errorbar(df['feature'][:N], df['importance'][:N], yerr=df['importance_std'][:N], fmt='none', capsize=3, color = 'darkgrey')
@@ -502,8 +488,13 @@ def calculate_permutation_importance(model_file, x, y, n_repeats=5, n_toplot =7,
     plt.tight_layout()
     
     if save:
-        plt.savefig("fig_feature_importance_permutation_{}_{}.png".format(filename, model_name))
+        plt.savefig("feature_importance_permutation_{}.png".format(model_name))
+        print("Saved feature importance plot to feature_importance_permutation_{}.png".format(model_name))
 
     plt.show() 
 
     return df
+
+
+
+

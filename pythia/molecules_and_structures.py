@@ -1,15 +1,29 @@
 # parts of this code are inspired by Chemical Space Analysis and Property Prediction for Carbon Capture Amine Molecules.
-#https://chemrxiv.org/engage/chemrxiv/article-details/6465d217f2112b41e9bebcc8
+#https://doi.org/10.1039/D3DD00073G
 #https://zenodo.org/records/10213104
 #https://github.com/flaviucipcigan/ccus_amine_prediction_workflow
 
 # Python packages and utilities
+import os
+from datetime import datetime
+import joblib
+import logging
+from io import BytesIO
+
+# Image libraries
+try:
+    import Image
+except ImportError:
+    from PIL import Image
+
 import pandas as pd
 import numpy as np
-import os
-import joblib
 
-#RDKit
+# Matplotlib
+import matplotlib.pyplot as plt
+from matplotlib_venn import venn2, venn2_circles, venn3, venn3_circles
+
+# RDKit
 from rdkit import Chem
 from rdkit.Chem import AllChem
 from rdkit.Chem.Draw import IPythonConsole
@@ -20,27 +34,40 @@ from rdkit.Chem import rdCoordGen
 from rdkit.Chem.Draw import rdMolDraw2D
 from rdkit import DataStructs
 
-# Matplotlib
-import matplotlib.pyplot as plt
-from matplotlib_venn import venn3, venn3_circles
-from matplotlib_venn import venn2, venn2_circles
-
-
-# Image libraries
-try:
-    import Image
-except ImportError:
-    from PIL import Image
-from io import BytesIO
-
-# Logging
-import logging
 
 
 def smiles_to_molcule(s, addH=False, canonicalize=True, threed=True, add_stereo=False, remove_stereo=False, random_seed=10459, verbose=False):
-    """ 
-    :param s: str - smiles string
-    :param addH: bool - Add Hydrogens or not
+    """Converts a SMILES string to an RDKit molecule object with optional modifications.
+
+    Parameters:
+    ----------
+    s : str
+        SMILES string representing the molecule.
+    addH : bool, optional
+        Whether to add hydrogens to the molecule (default is False).
+    canonicalize : bool, optional
+        Whether to canonicalize the molecule (default is True).
+    threed : bool, optional
+        Whether to generate a 3D conformation of the molecule (default is True if addH is True, False otherwise).
+    add_stereo : bool, optional
+        Whether to add stereochemistry information to the molecule (default is False).
+    remove_stereo : bool, optional
+        Whether to remove stereochemistry information from the molecule (default is False).
+    random_seed : int, optional
+        Random seed for 3D conformation generation (default is 10459).
+    verbose : bool, optional
+        Whether to log detailed information during molecule processing (default is False).
+
+    Returns:
+    -------
+    mol : RDKit molecule object
+        RDKit molecule object representing the molecule converted from SMILES.
+
+    Notes:
+    ------
+    This function uses RDKit for molecular operations. If `addH` is True, hydrogen atoms are added to the molecule
+    and optionally a 3D conformation is generated. If `add_stereo` is True, stereochemistry information is added
+    to the molecule. If `remove_stereo` is True, stereochemistry information is removed from the molecule.
     """
 
     log = logging.getLogger(__name__)
@@ -73,10 +100,21 @@ def smiles_to_molcule(s, addH=False, canonicalize=True, threed=True, add_stereo=
     return mol 
     
 def get_mol_from_smiles(smiles, canonicalize=True):
-    """ 
-    Function to make a mol object based on smiles
-    :param smiles: str - SMILES string
-    :param canonicalize: True/False - use RDKit canonicalized smile or the input resprectively
+    """
+    Converts a SMILES string into an RDKit molecule object.
+
+    Parameters:
+    ----------
+    smiles : str
+        SMILES string representing the molecule.
+    canonicalize : bool, optional
+        Whether to use RDKit canonicalized SMILES (default is True).
+
+    Returns:
+    -------
+    mol : RDKit molecule object
+        RDKit molecule object corresponding to the input SMILES.
+
     """
 
     log = logging.getLogger(__name__)
@@ -96,6 +134,11 @@ def get_mol_from_smiles(smiles, canonicalize=True):
 def check_stereo(mol, clear_props=False):
     """
     Function to check the status of the molecules CIP codes for isomers
+
+    Parameters:
+    ----------
+    mol : RDKit molecule object
+        RDKit molecule object corresponding to the input SMILES.
     """
     
     log = logging.getLogger(__name__)
@@ -129,7 +172,6 @@ def molecule_image(mol, smile, fnam=None, label_with_num=True):
     :param mol: object molecule 
     :param smile: smiles string
     :param fnam: file name
-    :return:
     """
 
     log = logging.getLogger(__name__)
@@ -246,32 +288,6 @@ def mol_grid(smiles=None, mols=None, mol_row=3, subimage_size=(200, 200), labels
 
     return grid
 
-def draw_mols_grid(mols, molsPerRow=3, subImgSize=(300, 300)):
-    """
-    Function to draw a list of molecules in a grid. Ref: https://www.rdkit.org/docs/source/rdkit.Chem.Draw.rdMolDraw2D.html#rdkit.Chem.Draw.rdMolDraw2D.MolDraw2D
-    :param mols: list of molecules as RDKit objects
-    :param molsPerRow: int - number of molecules per row
-    :param subImgSize: tuple - size of the sub image
-    """
-
-    nRows = len(mols) // molsPerRow
-    if len(mols) % molsPerRow: nRows += 1
-    fullSize = (molsPerRow * subImgSize[0], nRows * subImgSize[1])
-    full_image = Image.new('RGBA', fullSize )
-    for ii, mol in enumerate(mols):
-        if mol.GetNumConformers() == 0:
-            AllChem.Compute2DCoords(mol)
-        column = ii % molsPerRow
-        row = ii // molsPerRow
-        offset = ( column*subImgSize[0], row * subImgSize[1] )
-        d2d = rdMolDraw2D.MolDraw2DCairo(subImgSize[0], subImgSize[1])
-        d2d.DrawMolecule(mol)
-        d2d.FinishDrawing()
-        sub = Image.open(BytesIO(d2d.GetDrawingText()))
-        full_image.paste(sub,box=offset)
-    return full_image
-
-
 def twod_mol_align(molecules, template_smarts=None, template_smiles=None):
     """
     Function to align 2D RDkit molecules.
@@ -298,6 +314,24 @@ def twod_mol_align(molecules, template_smarts=None, template_smiles=None):
 
 
 def substructure_match(substructure_smarts, mols):
+    """
+        Find molecules in a list that match a specified substructure SMARTS pattern.
+
+        Parameters:
+        ----------
+        substructure_smarts : str
+            SMARTS pattern representing the substructure to search for.
+        mols : list of RDKit molecule objects
+            List of RDKit molecule objects to search within.
+
+        Returns:
+        -------
+        matches : list
+            List of RDKit molecule objects that contain the substructure defined by `substructure_smarts`.
+        indices : list
+            List of indices corresponding to the positions of `matches` within the input `mols` list.
+
+    """
 
     log = logging.getLogger(__name__)
 
@@ -315,6 +349,25 @@ def substructure_match(substructure_smarts, mols):
     return matches, indices
 
 def overlap_venn(dict):
+    """
+        Generate Venn diagrams to visualize overlaps between sets of molecules based on different substructure patterns.
+
+        Parameters:
+        ----------
+        dict : dict
+            Dictionary where keys are substructure names and values are lists of RDKit molecule objects.
+
+        Returns:
+        -------
+        None
+
+        Notes:
+        ------
+        This function generates Venn diagrams using Matplotlib and Matplotlib-Venn to visualize overlaps between sets of molecules
+        defined by different substructure patterns. It iterates through combinations of substructure patterns to create Venn diagrams
+        for pairwise and triplet overlaps. Each Venn diagram is saved as a PNG file named according to the substructure patterns involved.
+    """
+
     n_substructure = len(dict.keys())
     substructure_name = list(dict.keys())
     
@@ -569,8 +622,7 @@ def get_fingerprints_bit_importance(model_file, features_df, non_fingerprint_fea
             #df_feature_importance = df_feature_importance.append({"feature": i, "importance": 0}, ignore_index=True)
             #df = df_feature_importance.append({"feature": i, "importance": 0}, ignore_index=True)
             #print(i)
-            j = 'fp_' + str(i)
-            df_feature_importance = pd.concat([df_feature_importance, pd.DataFrame([{"feature": j, "importance": 0}])], ignore_index=True)
+            df_feature_importance = pd.concat([df_feature_importance, pd.DataFrame([{"feature": i, "importance": 0}])], ignore_index=True)
 
     df = df_feature_importance.sort_values(by=["feature"])
     print(len(df.feature))
@@ -620,7 +672,7 @@ def plot_fingerprints_bit_importance(smiles, df_feature_importance, radius=2, nB
     
     for i in range(n_mols):
         smi = smiles[i]
-        print(smi)
+        #print(smi)
         try: 
             mol = Chem.MolFromSmiles(smi)
 
