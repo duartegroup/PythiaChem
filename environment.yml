@@ -8,7 +8,7 @@ dependencies:
   - jupyter
   - pip==23.3
   - pip:
-    - shap==0.44.0
+    - cairosvg==2.7.1
     - imbalanced-learn==0.11.0
     - matplotlib==3.8.2
     - matplotlib-inline==0.1.6
@@ -17,10 +17,12 @@ dependencies:
     - mordred==1.2.0
     - numpy==1.23.3
     - pandas==1.4.4
+    - plotly==5.22.0
     - py3dmol==2.0.4
     - rdkit==2023.9.4
     - scikit-learn==1.4.0
     - scikit-plot==0.3.7
     - scipy==1.11.4
     - seaborn==0.13.1
+    - shap==0.44.1
     - tqdm==4.66.1
