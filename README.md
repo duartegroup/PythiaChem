@@ -62,4 +62,7 @@ pip install -e .
 conda install -c anaconda ipykernel -y
 python -m ipykernel install --user --name=pythiachem
 ```
-If you would like to run the unit tests please make a folder named "test_directory" in the tests folder and in a terminal run python -m unittest *.py
+If you would like to run the unit tests please make a folder named "test_directory" in the tests folder and in a terminal run
+```Bash
+python -m unittest *.py
+```
