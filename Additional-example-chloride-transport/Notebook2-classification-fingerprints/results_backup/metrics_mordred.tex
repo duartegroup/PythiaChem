@@ -1,0 +1,16 @@
+\begin{table}[H]
+\centering
+\caption{Classifier metrics for balanced data. MCC is the Matthew’s correlation coefficent.}
+\label{tbl:mordred_features}
+\begin{tabular}{lrrrrrr}
+\toprule
+{} &  Accuracy &  Sensitivity &  Specificity &  MCC &  Precision &  G-mean \\
+\midrule
+nearest neighbors   &      0.68 &         0.44 &         0.82 & 0.28 &       0.58 &    0.60 \\
+gaussian process    &      0.82 &         0.75 &         0.86 & 0.61 &       0.75 &    0.80 \\
+decision tree       &      0.84 &         1.00 &         0.75 & 0.72 &       0.70 &    0.87 \\
+adaboost            &      0.77 &         1.00 &         0.64 & 0.63 &       0.62 &    0.80 \\
+logistic regression &      0.89 &         0.88 &         0.89 & 0.76 &       0.82 &    0.88 \\
+\bottomrule
+\end{tabular}
+\end{table}
