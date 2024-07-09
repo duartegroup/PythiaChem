@@ -5,7 +5,6 @@ Paper: https://chemrxiv.org/engage/chemrxiv/article-details/6504251fb338ec988a83
 
 <img width="1002" alt="Pythia" src="https://github.com/duartegroup/PythiaChem/assets/46780283/be55d979-6bee-41c6-9923-c5223bd4233d">
 
-*For a full demonstration of all notebooks available, please refer to the 'Example-enantioselective-Strecker-synthesis' folder!*
 
 ## Supported functionality
 ### Tasks:
@@ -27,7 +26,7 @@ Paper: https://chemrxiv.org/engage/chemrxiv/article-details/6504251fb338ec988a83
 We are working on populating this package with more models and other building blocks.
 
 ### Notebooks:
-Please refer to 'Example-enantioselective-Strecker-synthesis' for the full desmontration of all notebooks.
+*Please refer to 'Example-enantioselective-Strecker-synthesis' for the full desmontration of all notebooks.*
 - data analysis: data exploration, visualization, scaling
 - regression-fingerprints: regression with fingerprints, data set split, ensemble models
 - regression-Mordred: regression with Mordred, feature elimination techniques, data set split
