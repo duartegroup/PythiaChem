@@ -5,7 +5,7 @@ Paper: https://chemrxiv.org/engage/chemrxiv/article-details/6504251fb338ec988a83
 
 <img width="1002" alt="Pythia" src="https://github.com/duartegroup/PythiaChem/assets/46780283/be55d979-6bee-41c6-9923-c5223bd4233d">
 
-
+*For a full demonstration of all notebooks available, please refer to the 'Example-enantioselective-Strecker-synthesis' folder!*
 
 ## Supported functionality
 ### Tasks:
